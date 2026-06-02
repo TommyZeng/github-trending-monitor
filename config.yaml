@@ -1,0 +1,6 @@
+daily_top_n: 10
+languages: null        # null=全部;或 [Python, Rust, TypeScript]
+semantic_top_k: 10
+embedding_model: "BAAI/bge-m3"
+trending_since: "daily"
+data_dir: "data"

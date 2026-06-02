@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitHub 热门项目搜索</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 820px; margin: 2rem auto; padding: 0 1rem; }
+    .bar { display: flex; gap: .5rem; margin-bottom: 1rem; }
+    input { flex: 1; padding: .6rem; font-size: 1rem; }
+    button { padding: .6rem 1rem; cursor: pointer; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: .8rem 1rem; margin: .6rem 0; }
+    .card a { font-weight: 600; font-size: 1.05rem; text-decoration: none; }
+    .meta { color: #666; font-size: .85rem; margin: .3rem 0; }
+    .topics { color: #0969da; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <h2>GitHub 热门项目搜索</h2>
+  <div class="bar">
+    <input id="q" placeholder="输入一句话,如:Rust 写的终端 AI 助手" />
+    <button onclick="run('semantic')">语义搜索</button>
+    <button onclick="run('keyword')">GitHub 关键词</button>
+  </div>
+  <div id="results"></div>
+  <script>
+    async function run(mode) {
+      const q = document.getElementById('q').value.trim();
+      if (!q) return;
+      const box = document.getElementById('results');
+      box.innerHTML = '搜索中…';
+      const r = await fetch(`/api/${mode}?q=` + encodeURIComponent(q));
+      const data = await r.json();
+      if (!data.results.length) { box.innerHTML = '无结果'; return; }
+      box.innerHTML = data.results.map(p => `
+        <div class="card">
+          <a href="${p.url}" target="_blank">${p.full_name}</a>
+          <div class="meta">⭐ ${p.stars ?? 0} · ${p.language ?? '?'}${p.score != null ? ' · 相似度 ' + p.score.toFixed(3) : ''}</div>
+          <div>${p.description ?? ''}</div>
+          <div class="topics">${(p.topics || []).join(', ')}</div>
+        </div>`).join('');
+    }
+  </script>
+</body>
+</html>
