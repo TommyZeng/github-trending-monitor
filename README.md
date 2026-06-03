@@ -31,8 +31,12 @@
    ```
    浏览器打开 http://127.0.0.1:8000 。
 
+### 收藏
+搜索结果卡片上点「收藏」即把该项目加入**本地收藏库**(`data/favorites/`,已 gitignore、不提交),
+之后「本地语义」会同时检索 trending 库 + 收藏库,收藏项标「★ 已收藏」。
+
 ### 三种搜索模式
-- **本地语义**:在累积的 trending 库里按向量相似度找(库越大越准)。
+- **本地语义**:在累积的 trending 库 + 你的收藏库里按向量相似度找(库越大越准)。
 - **实时语义**:一句话 → LLM 提取多组关键词 → 每组实时搜 GitHub top N → bge-reranker 重排 → 返回最相关的(覆盖全 GitHub、实时)。需配 `llm_api_base` + `reranker_api_base`,key 放 `.env`(`LLM_API_KEY`、`RERANKER_API_KEY`)。**强烈建议配 `GITHUB_TOKEN`**(每次会发多个搜索请求)。
 - **GitHub 关键词**:把输入直接当查询词调 GitHub Search API。
 

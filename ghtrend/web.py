@@ -1,13 +1,18 @@
 import os
+from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from . import store, github_enricher
 from .config import Config
-from .embedder import build_text  # noqa: F401  (保持依赖显式)
+from .embedder import build_text
 
 _TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates", "index.html")
+
+
+def _fav_dir(config: Config) -> str:
+    return os.path.join(config.data_dir, "favorites")
 
 
 def create_app(config: Config, embedder, github_token,
@@ -24,7 +29,12 @@ def create_app(config: Config, embedder, github_token,
 
     @app.get("/api/semantic")
     def semantic(q: str):
-        projects, embeddings = store.load(config.data_dir)
+        # 同时检索 trending 库 + 收藏库(收藏优先去重)
+        fav_p, fav_e = store.load(_fav_dir(config))
+        for p in fav_p:
+            p["favorited"] = True
+        tr_p, tr_e = store.load(config.data_dir)
+        projects, embeddings = store.merge([(fav_p, fav_e), (tr_p, tr_e)])
         if not projects:
             return JSONResponse({"results": []})
         qvec = embedder.encode([q])[0]
@@ -35,6 +45,19 @@ def create_app(config: Config, embedder, github_token,
             p["score"] = score
             results.append(p)
         return JSONResponse({"results": results})
+
+    @app.post("/api/favorite")
+    def favorite(project: dict = Body(...)):
+        fn = project.get("full_name")
+        if not fn:
+            return JSONResponse({"ok": False, "error": "缺少 full_name"}, status_code=400)
+        today = datetime.now(timezone.utc).date().isoformat()
+        vec = embedder.encode([build_text(project)])
+        fav_dir = _fav_dir(config)
+        projects, embeddings = store.load(fav_dir)
+        projects, embeddings = store.upsert(projects, embeddings, [project], vec, today)
+        store.save(fav_dir, projects, embeddings)
+        return JSONResponse({"ok": True, "favorited": fn, "count": len(projects)})
 
     @app.get("/api/keyword")
     def keyword(q: str):

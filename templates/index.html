@@ -13,6 +13,8 @@
     .card a { font-weight: 600; font-size: 1.05rem; text-decoration: none; }
     .meta { color: #666; font-size: .85rem; margin: .3rem 0; }
     .topics { color: #0969da; font-size: .8rem; }
+    .fav-btn { float: right; padding: .2rem .6rem; font-size: .8rem; }
+    .fav-badge { float: right; color: #b8860b; font-size: .85rem; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -25,6 +27,7 @@
   </div>
   <div id="results"></div>
   <script>
+    let lastResults = [];
     async function run(mode) {
       const q = document.getElementById('q').value.trim();
       if (!q) return;
@@ -32,14 +35,29 @@
       box.innerHTML = '搜索中…';
       const r = await fetch(`/api/${mode}?q=` + encodeURIComponent(q));
       const data = await r.json();
-      if (!data.results.length) { box.innerHTML = '无结果'; return; }
-      box.innerHTML = data.results.map(p => `
+      lastResults = data.results || [];
+      if (!lastResults.length) { box.innerHTML = data.error || '无结果'; return; }
+      box.innerHTML = lastResults.map((p, i) => `
         <div class="card">
           <a href="${p.url}" target="_blank">${p.full_name}</a>
+          ${p.favorited ? '<span class="fav-badge">★ 已收藏</span>'
+                        : `<button class="fav-btn" id="fav-${i}" onclick="favorite(${i})">收藏</button>`}
           <div class="meta">⭐ ${p.stars ?? 0} · ${p.language ?? '?'}${p.score != null ? ' · 相似度 ' + p.score.toFixed(3) : ''}</div>
           <div>${p.summary_zh || p.description_zh || p.description || ''}</div>
           <div class="topics">${(p.topics || []).join(', ')}</div>
         </div>`).join('');
+    }
+    async function favorite(i) {
+      const btn = document.getElementById('fav-' + i);
+      if (btn) { btn.disabled = true; btn.textContent = '收藏中…'; }
+      try {
+        const r = await fetch('/api/favorite', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(lastResults[i]),
+        });
+        const d = await r.json();
+        if (btn) btn.textContent = d.ok ? '★ 已收藏' : '收藏失败';
+      } catch (e) { if (btn) { btn.disabled = false; btn.textContent = '重试收藏'; } }
     }
   </script>
 </body>

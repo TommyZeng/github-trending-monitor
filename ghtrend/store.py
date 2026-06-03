@@ -74,6 +74,24 @@ def upsert(projects: list[dict], embeddings: np.ndarray,
     return projects, out
 
 
+def merge(stores: list[tuple[list[dict], np.ndarray]]) -> tuple[list[dict], np.ndarray]:
+    """按给定顺序合并多个 (projects, embeddings),按 full_name 去重(靠前的优先),
+    保持 projects 与 embeddings 行对齐。用于本地语义搜索同时检索 trending + 收藏库。"""
+    out_proj: list[dict] = []
+    rows = []
+    seen: set[str] = set()
+    for projects, embs in stores:
+        for i, p in enumerate(projects):
+            fn = p.get("full_name")
+            if not fn or fn in seen:
+                continue
+            seen.add(fn)
+            out_proj.append(p)
+            rows.append(embs[i])
+    out_emb = np.vstack(rows).astype(np.float32) if rows else np.zeros((0, 0), dtype=np.float32)
+    return out_proj, out_emb
+
+
 def cosine_topk(query_vec: np.ndarray, embeddings: np.ndarray, k: int) -> list[tuple[int, float]]:
     if embeddings.shape[0] == 0:
         return []

@@ -3,3 +3,5 @@ __pycache__/
 .venv/
 .pytest_cache/
 .env
+# 收藏库:本地私有,不提交
+data/favorites/

@@ -102,3 +102,34 @@ def test_realtime_applies_summary(tmp_path):
     client = TestClient(app)
     r = client.get("/api/realtime", params={"q": "x"})
     assert r.json()["results"][0]["summary_zh"] == "中文摘要:rt/repo"
+
+
+def test_favorite_then_semantic_finds_it(tmp_path):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    proj = {"full_name": "fav/repo", "url": "u", "description": "d",
+            "stars": 1, "language": "Go", "topics": ["x"]}
+    r = client.post("/api/favorite", json=proj)
+    assert r.json()["ok"] is True
+    assert r.json()["count"] == 1
+
+    r2 = client.get("/api/semantic", params={"q": "anything"})
+    results = r2.json()["results"]
+    assert any(p["full_name"] == "fav/repo" and p.get("favorited") for p in results)
+
+
+def test_favorite_requires_full_name(tmp_path):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    r = client.post("/api/favorite", json={"description": "no name"})
+    assert r.status_code == 400
+    assert r.json()["ok"] is False
+
+
+def test_favorite_dedups(tmp_path):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    proj = {"full_name": "fav/repo", "url": "u", "description": "d", "topics": []}
+    client.post("/api/favorite", json=proj)
+    r = client.post("/api/favorite", json=proj)
+    assert r.json()["count"] == 1   # 重复收藏不增加

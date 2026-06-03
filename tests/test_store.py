@@ -56,6 +56,27 @@ def test_save_rejects_misaligned(tmp_path):
         store.save(str(tmp_path), [_item("a/x")], np.zeros((2, 2), dtype=np.float32))
 
 
+def test_merge_dedups_by_full_name_keeping_priority_and_alignment():
+    # 第一个 store 优先(收藏),与第二个(trending)有重叠 b/y
+    fav_p = [_item("b/y", desc="fav"), _item("c/z")]
+    fav_e = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    tr_p = [_item("a/x"), _item("b/y", desc="trending")]
+    tr_e = np.array([[0.5, 0.5], [0.9, 0.1]], dtype=np.float32)
+
+    projects, embs = store.merge([(fav_p, fav_e), (tr_p, tr_e)])
+    names = [p["full_name"] for p in projects]
+    assert names == ["b/y", "c/z", "a/x"]          # 收藏优先,b/y 去重只留一次
+    assert projects[0]["description"] == "fav"      # 保留的是收藏那条
+    assert embs.shape == (3, 2)
+    assert np.allclose(embs[0], [1.0, 0.0])         # b/y 用的是收藏的向量(对齐正确)
+    assert np.allclose(embs[2], [0.5, 0.5])         # a/x 用 trending 的向量
+
+
+def test_merge_handles_empty_stores():
+    projects, embs = store.merge([([], np.zeros((0, 0), dtype=np.float32))])
+    assert projects == [] and embs.shape[0] == 0
+
+
 def test_cosine_topk_orders_by_similarity():
     embs = np.array([[1.0, 0.0], [0.0, 1.0], [0.7, 0.7]], dtype=np.float32)
     q = np.array([1.0, 0.0], dtype=np.float32)
