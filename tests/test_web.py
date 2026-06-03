@@ -52,3 +52,25 @@ def test_keyword_search_uses_github(tmp_path, monkeypatch):
     client = TestClient(app)
     r = client.get("/api/keyword", params={"q": "rust"})
     assert r.json()["results"][0]["full_name"] == "z/found"
+
+
+def test_realtime_uses_injected_fn(tmp_path):
+    calls = {}
+    def fake_realtime(q):
+        calls["q"] = q
+        return [{"full_name": "rt/repo", "url": "u", "description": "d", "score": 0.9}]
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None,
+                         realtime_fn=fake_realtime)
+    client = TestClient(app)
+    r = client.get("/api/realtime", params={"q": "用Rust写的CLI"})
+    assert calls["q"] == "用Rust写的CLI"
+    assert r.json()["results"][0]["full_name"] == "rt/repo"
+
+
+def test_realtime_disabled_when_no_fn(tmp_path):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    r = client.get("/api/realtime", params={"q": "x"})
+    body = r.json()
+    assert body["results"] == []
+    assert "error" in body

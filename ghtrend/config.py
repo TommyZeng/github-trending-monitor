@@ -13,6 +13,12 @@ class Config:
     # 本机语义搜索可改用在线 OpenAI 兼容 embedding 服务(留空则用本地模型)
     embedding_api_base: str = ""
     embedding_api_model: str = "bge-m3"
+    # 实时 GitHub 语义搜索:LLM 提关键词 + reranker 重排(留空 llm_api_base 则禁用该模式)
+    llm_api_base: str = ""
+    llm_model: str = "deepseek-v4-flash"
+    reranker_api_base: str = ""
+    reranker_model: str = "bge-reranker-v2-m3"
+    realtime_per_keyword: int = 10
     trending_since: str = "daily"
     data_dir: str = "data"
 
@@ -40,3 +46,11 @@ def get_github_token() -> str | None:
 
 def get_embedding_api_key() -> str | None:
     return os.environ.get("EMBEDDING_API_KEY")
+
+
+def get_llm_api_key() -> str | None:
+    return os.environ.get("LLM_API_KEY")
+
+
+def get_reranker_api_key() -> str | None:
+    return os.environ.get("RERANKER_API_KEY")
