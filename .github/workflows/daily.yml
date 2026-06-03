@@ -1,3 +1,4 @@
+# GitHub 每日热门项目采集与 Discord 推送工作流
 name: daily-collect
 
 on:
