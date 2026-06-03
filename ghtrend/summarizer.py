@@ -1,6 +1,10 @@
 import json
 import re
 
+# 每条描述送入摘要 prompt 前的最大字符数(生成一句话摘要用不到更多;
+# 防个别仓库的超长描述/满屏全角空格撑爆 LLM 上下文导致整批摘要失败)。
+MAX_DESC_CHARS = 300
+
 _PROMPT = (
     "下面是若干 GitHub 项目(描述里可能混有 emoji、徽章、中英文)。"
     "请为每个项目生成一句简洁通顺的中文摘要,说明它是做什么的,不超过 40 字,去掉无关符号。"
@@ -12,7 +16,7 @@ def _build_block(items: list[dict]) -> str:
     lines = []
     for i, p in enumerate(items, 1):
         topics = ", ".join(p.get("topics") or [])
-        desc = p.get("description") or ""
+        desc = (p.get("description") or "")[:MAX_DESC_CHARS]
         lines.append(f"{i}. {p.get('full_name', '')} | {desc} | topics: {topics}")
     return "\n".join(lines)
 

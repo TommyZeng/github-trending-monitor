@@ -48,3 +48,11 @@ def test_add_summaries_returns_items_unchanged_on_error():
 
 def test_add_summaries_empty_list():
     assert summarizer.add_summaries([], "http://llm/v1", "m", session=_Session("[]")) == []
+
+
+def test_build_block_truncates_long_description():
+    items = [{"full_name": "a/x", "description": "y" * 50000, "topics": []}]
+    block = summarizer._build_block(items)
+    # 单条描述不应把整段 5 万字符塞进 prompt
+    assert len(block) < summarizer.MAX_DESC_CHARS + 200
+    assert "y" * (summarizer.MAX_DESC_CHARS + 1) not in block
