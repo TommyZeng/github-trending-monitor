@@ -29,7 +29,7 @@
    ```bash
    ./run_web.sh                    # 自动载入 .env、git pull 最新数据、起服务
    ```
-   浏览器打开 http://127.0.0.1:8000 。
+   浏览器打开 http://127.0.0.1:8005 (端口可在 config.yaml 的 web_port 改)。
 
 ### 收藏
 搜索结果卡片上点「收藏」即把该项目加入**本地收藏库**(`data/favorites/`,已 gitignore、不提交),

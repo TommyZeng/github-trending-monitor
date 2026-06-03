@@ -109,7 +109,8 @@ def main() -> None:
 
     app = create_app(cfg, embedder, github_token,
                      realtime_fn=realtime_fn, summarize_fn=summarize_fn)
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    print(f"启动 web 服务: http://127.0.0.1:{cfg.web_port}")
+    uvicorn.run(app, host="127.0.0.1", port=cfg.web_port)
 
 
 if __name__ == "__main__":

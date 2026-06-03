@@ -19,6 +19,7 @@ class Config:
     reranker_api_base: str = ""
     reranker_model: str = "bge-reranker-v2-m3"
     realtime_per_keyword: int = 10
+    web_port: int = 8005
     trending_since: str = "daily"
     data_dir: str = "data"
 
