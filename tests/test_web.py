@@ -74,3 +74,31 @@ def test_realtime_disabled_when_no_fn(tmp_path):
     body = r.json()
     assert body["results"] == []
     assert "error" in body
+
+
+def _summarize(items):
+    for it in items:
+        it["summary_zh"] = "中文摘要:" + it["full_name"]
+    return items
+
+
+def test_keyword_applies_summary(tmp_path, monkeypatch):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), "tok",
+                         summarize_fn=_summarize)
+    monkeypatch.setattr(web.github_enricher, "search_repos",
+                        lambda q, token=None, limit=10: [
+                            {"full_name": "z/found", "url": "u", "description": "raw",
+                             "stars": 1, "language": "C", "topics": []}])
+    client = TestClient(app)
+    r = client.get("/api/keyword", params={"q": "rust"})
+    assert r.json()["results"][0]["summary_zh"] == "中文摘要:z/found"
+
+
+def test_realtime_applies_summary(tmp_path):
+    app = web.create_app(
+        Config(data_dir=str(tmp_path)), _DummyEmbedder(), None,
+        realtime_fn=lambda q: [{"full_name": "rt/repo", "url": "u", "description": "raw"}],
+        summarize_fn=_summarize)
+    client = TestClient(app)
+    r = client.get("/api/realtime", params={"q": "x"})
+    assert r.json()["results"][0]["summary_zh"] == "中文摘要:rt/repo"

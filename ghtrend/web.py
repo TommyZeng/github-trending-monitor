@@ -10,8 +10,12 @@ from .embedder import build_text  # noqa: F401  (保持依赖显式)
 _TEMPLATE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates", "index.html")
 
 
-def create_app(config: Config, embedder, github_token, realtime_fn=None) -> FastAPI:
+def create_app(config: Config, embedder, github_token,
+               realtime_fn=None, summarize_fn=None) -> FastAPI:
     app = FastAPI(title="GitHub Trending Search")
+
+    def _summarize(results):
+        return summarize_fn(results) if summarize_fn else results
 
     @app.get("/", response_class=HTMLResponse)
     def index():
@@ -36,14 +40,14 @@ def create_app(config: Config, embedder, github_token, realtime_fn=None) -> Fast
     def keyword(q: str):
         results = github_enricher.search_repos(
             q, token=github_token, limit=config.semantic_top_k)
-        return JSONResponse({"results": results})
+        return JSONResponse({"results": _summarize(results)})
 
     @app.get("/api/realtime")
     def realtime(q: str):
         if realtime_fn is None:
             return JSONResponse(
                 {"results": [], "error": "实时语义搜索未启用(需配置 llm_api_base / reranker_api_base)"})
-        return JSONResponse({"results": realtime_fn(q)})
+        return JSONResponse({"results": _summarize(realtime_fn(q))})
 
     return app
 
@@ -53,9 +57,10 @@ def main() -> None:
     from .config import (load_config, get_github_token, get_embedding_api_key,
                          get_llm_api_key, get_reranker_api_key)
     from .embedder import Embedder, RemoteEmbedder
-    from . import realtime_search
+    from . import realtime_search, summarizer
     cfg = load_config()
     github_token = get_github_token()
+    llm_key = get_llm_api_key()
     if cfg.embedding_api_base:
         embedder = RemoteEmbedder(cfg.embedding_api_base, cfg.embedding_api_model,
                                   api_key=get_embedding_api_key())
@@ -66,14 +71,21 @@ def main() -> None:
 
     realtime_fn = None
     if cfg.llm_api_base and cfg.reranker_api_base:
-        llm_key, rr_key = get_llm_api_key(), get_reranker_api_key()
+        rr_key = get_reranker_api_key()
         realtime_fn = lambda q: realtime_search.search(
             q, cfg, github_token=github_token, llm_api_key=llm_key, reranker_api_key=rr_key)
         print(f"实时语义搜索已启用: 关键词={cfg.llm_model} 重排={cfg.reranker_model}")
     else:
         print("实时语义搜索未启用(未配置 llm_api_base / reranker_api_base)")
 
-    app = create_app(cfg, embedder, github_token, realtime_fn=realtime_fn)
+    summarize_fn = None
+    if cfg.llm_api_base:
+        summarize_fn = lambda items: summarizer.add_summaries(
+            items, cfg.llm_api_base, cfg.llm_model, api_key=llm_key)
+        print(f"GitHub 搜索结果中文摘要已启用: {cfg.llm_model}")
+
+    app = create_app(cfg, embedder, github_token,
+                     realtime_fn=realtime_fn, summarize_fn=summarize_fn)
     uvicorn.run(app, host="127.0.0.1", port=8000)
 
 
