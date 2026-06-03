@@ -42,7 +42,7 @@ def save(data_dir: str, projects: list[dict], embeddings: np.ndarray) -> None:
     np.save(pemb, embeddings.astype(np.float32))
 
 
-_UPDATE_FIELDS = ("url", "description", "stars", "language", "topics", "readme_excerpt")
+_UPDATE_FIELDS = ("url", "description", "description_zh", "stars", "language", "topics", "readme_excerpt")
 
 
 def upsert(projects: list[dict], embeddings: np.ndarray,

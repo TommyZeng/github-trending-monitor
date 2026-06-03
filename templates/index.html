@@ -36,7 +36,7 @@
         <div class="card">
           <a href="${p.url}" target="_blank">${p.full_name}</a>
           <div class="meta">⭐ ${p.stars ?? 0} · ${p.language ?? '?'}${p.score != null ? ' · 相似度 ' + p.score.toFixed(3) : ''}</div>
-          <div>${p.description ?? ''}</div>
+          <div>${p.description_zh || p.description || ''}</div>
           <div class="topics">${(p.topics || []).join(', ')}</div>
         </div>`).join('');
     }

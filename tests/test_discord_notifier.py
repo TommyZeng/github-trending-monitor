@@ -16,6 +16,19 @@ def test_build_payload_makes_embeds():
     assert "10" in payload["embeds"][0]["description"]
 
 
+def test_build_payload_prefers_chinese_description():
+    p = _p("a/x", 10)
+    p["description_zh"] = "一个很棒的项目"
+    payload = discord_notifier.build_payload([p], "T")
+    assert "一个很棒的项目" in payload["embeds"][0]["description"]
+    assert "desc" not in payload["embeds"][0]["description"]
+
+
+def test_build_payload_falls_back_to_english_without_zh():
+    payload = discord_notifier.build_payload([_p("a/x", 10)], "T")
+    assert "desc" in payload["embeds"][0]["description"]
+
+
 def test_build_payload_caps_at_10():
     payload = discord_notifier.build_payload([_p(f"o/r{i}", i) for i in range(15)], "T")
     assert len(payload["embeds"]) == 10

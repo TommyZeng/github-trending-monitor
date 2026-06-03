@@ -7,7 +7,7 @@ def build_payload(projects: list[dict], title: str) -> dict:
     embeds = []
     for p in projects[:MAX_EMBEDS]:
         topics = ", ".join(p.get("topics") or [])
-        desc = p.get("description") or "(no description)"
+        desc = p.get("description_zh") or p.get("description") or "(no description)"
         lang = p.get("language") or "?"
         embeds.append({
             "title": p["full_name"],

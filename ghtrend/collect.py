@@ -1,4 +1,4 @@
-from datetime import date, timezone, datetime
+from datetime import timezone, datetime
 
 from . import store
 from .config import Config, load_config, get_webhook_url, get_github_token
@@ -6,10 +6,12 @@ from .embedder import Embedder, build_text
 from .trending_fetcher import fetch_trending
 from .github_enricher import enrich
 from .discord_notifier import send
+from .translator import translate_to_zh
 
 
 def run(config: Config, webhook_url: str, github_token, embedder, today=None,
-        fetcher=fetch_trending, enricher=enrich, notifier=send) -> None:
+        fetcher=fetch_trending, enricher=enrich, notifier=send,
+        translate=translate_to_zh) -> None:
     today = today or datetime.now(timezone.utc).date().isoformat()
 
     raw = fetcher(since=config.trending_since, language=config.languages[0]
@@ -18,6 +20,7 @@ def run(config: Config, webhook_url: str, github_token, embedder, today=None,
     for item in raw:
         meta = enricher(item["full_name"], token=github_token)
         if meta:
+            meta["description_zh"] = translate(meta.get("description"))
             enriched.append(meta)
 
     if not enriched:

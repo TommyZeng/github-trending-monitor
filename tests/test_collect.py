@@ -28,7 +28,8 @@ def test_run_collects_dedups_and_notifies(tmp_path):
         sent["names"] = [p["full_name"] for p in projects]
 
     collect.run(cfg, "https://hook", "tok", _DummyEmbedder(), today="2026-06-02",
-                fetcher=fake_fetcher, enricher=fake_enricher, notifier=fake_notifier)
+                fetcher=fake_fetcher, enricher=fake_enricher, notifier=fake_notifier,
+                translate=lambda s: f"[zh]{s}")
 
     projects, embs = store.load(str(tmp_path))
     assert len(projects) == 2
@@ -36,6 +37,8 @@ def test_run_collects_dedups_and_notifies(tmp_path):
     # 推送按 star 降序取 top 2
     assert sent["names"] == ["b/y", "a/x"]
     assert "2026-06-02" in sent["title"]
+    # 每个项目都写入了中文描述
+    assert all(p["description_zh"] == "[zh]d" for p in projects)
 
 
 def test_run_skips_failed_enrichment(tmp_path):
@@ -51,7 +54,7 @@ def test_run_skips_failed_enrichment(tmp_path):
 
     collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-06-02",
                 fetcher=fake_fetcher, enricher=fake_enricher,
-                notifier=lambda *a, **k: None)
+                notifier=lambda *a, **k: None, translate=lambda s: s)
 
     projects, _ = store.load(str(tmp_path))
     assert [p["full_name"] for p in projects] == ["a/x"]
