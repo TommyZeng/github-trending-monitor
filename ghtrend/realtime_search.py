@@ -4,6 +4,10 @@ from .keyword_extractor import extract_keywords
 from .github_enricher import search_repos
 from .reranker import rerank
 
+# 单个文档送入 reranker 前的最大字符数(reranker 上下文上限 8192 token,
+# 描述类文本远用不到;截断可防个别仓库超长描述触发 400)。
+MAX_DOC_CHARS = 2000
+
 
 def search(query: str, config: Config, github_token=None,
            llm_api_key=None, reranker_api_key=None,
@@ -23,7 +27,7 @@ def search(query: str, config: Config, github_token=None,
     if not candidates:
         return []
 
-    docs = [build_text(c) for c in candidates]
+    docs = [build_text(c)[:MAX_DOC_CHARS] for c in candidates]
     ranked = rerank_fn(query, docs, config.reranker_api_base, config.reranker_model,
                        api_key=reranker_api_key)
 

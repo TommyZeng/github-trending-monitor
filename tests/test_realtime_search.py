@@ -43,6 +43,22 @@ def test_search_extracts_searches_dedups_and_reranks():
     assert all(r["full_name"] != "o/beta" for r in results)
 
 
+def test_search_truncates_long_documents_before_rerank():
+    captured = {}
+
+    def fake_rerank(query, docs, base, model, api_key=None):
+        captured["docs"] = docs
+        return [(0, 0.9)]
+
+    huge = _repo("o/huge", desc="x" * 50000)  # 异常长描述
+    results = realtime_search.search(
+        "q", _cfg(), extract=lambda *a, **k: ["kw"],
+        searcher=lambda *a, **k: [huge], rerank_fn=fake_rerank)
+
+    assert len(captured["docs"][0]) <= realtime_search.MAX_DOC_CHARS
+    assert results[0]["full_name"] == "o/huge"
+
+
 def test_search_returns_empty_when_no_candidates():
     results = realtime_search.search(
         "q", _cfg(), extract=lambda *a, **k: ["kw"],
