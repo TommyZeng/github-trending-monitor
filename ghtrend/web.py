@@ -43,10 +43,17 @@ def create_app(config: Config, embedder, github_token) -> FastAPI:
 
 def main() -> None:
     import uvicorn
-    from .config import load_config, get_github_token
-    from .embedder import Embedder
+    from .config import load_config, get_github_token, get_embedding_api_key
+    from .embedder import Embedder, RemoteEmbedder
     cfg = load_config()
-    app = create_app(cfg, Embedder(cfg.embedding_model), get_github_token())
+    if cfg.embedding_api_base:
+        embedder = RemoteEmbedder(cfg.embedding_api_base, cfg.embedding_api_model,
+                                  api_key=get_embedding_api_key())
+        print(f"语义搜索使用在线 embedding 服务: {cfg.embedding_api_base} ({cfg.embedding_api_model})")
+    else:
+        embedder = Embedder(cfg.embedding_model)
+        print(f"语义搜索使用本地模型: {cfg.embedding_model}")
+    app = create_app(cfg, embedder, get_github_token())
     uvicorn.run(app, host="127.0.0.1", port=8000)
 
 

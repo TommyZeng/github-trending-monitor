@@ -20,12 +20,24 @@
 也可在 Actions 页手动 `Run workflow` 触发。
 
 ## 本机搜索
-```bash
-export GITHUB_TOKEN=<你的 PAT>   # 关键词搜索用,提高速率
-git pull                         # 拉取最新数据
-./run_web.sh
-```
-浏览器打开 http://127.0.0.1:8000 。
+1. 在项目根创建 `.env`(已被 `.gitignore` 忽略,不会提交):
+   ```
+   EMBEDDING_API_KEY=sk-xxx        # 在线 embedding 服务的 key
+   # GITHUB_TOKEN=ghp_xxx          # 可选,关键词搜索提速
+   ```
+2. 启动:
+   ```bash
+   ./run_web.sh                    # 自动载入 .env、git pull 最新数据、起服务
+   ```
+   浏览器打开 http://127.0.0.1:8000 。
+
+### 语义搜索的 embedding 后端
+- **在线服务(推荐)**:在 `config.yaml` 设 `embedding_api_base`(OpenAI 兼容,如自建 vLLM bge-m3),
+  key 放 `.env` 的 `EMBEDDING_API_KEY`。本机不下载模型,查询即时。
+- **本地模型**:把 `embedding_api_base` 留空 `""`,首次搜索会下载 `embedding_model`(约 2.3GB)。
+
+> 注意:Actions 云端采集时用的是本地 `embedding_model`(够不着内网在线服务),
+> 但只要在线服务与之同为 bge-m3,产出的向量一致,检索结果不受影响。
 
 ## 配置
-见 `config.yaml`(推送数量、语言过滤、embedding 模型等)。
+见 `config.yaml`(推送数量、语言过滤、embedding 模型与在线服务地址等)。

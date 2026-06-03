@@ -10,6 +10,9 @@ class Config:
     languages: list[str] | None = None
     semantic_top_k: int = 10
     embedding_model: str = "BAAI/bge-m3"
+    # 本机语义搜索可改用在线 OpenAI 兼容 embedding 服务(留空则用本地模型)
+    embedding_api_base: str = ""
+    embedding_api_model: str = "bge-m3"
     trending_since: str = "daily"
     data_dir: str = "data"
 
@@ -33,3 +36,7 @@ def get_webhook_url() -> str:
 
 def get_github_token() -> str | None:
     return os.environ.get("GITHUB_TOKEN")
+
+
+def get_embedding_api_key() -> str | None:
+    return os.environ.get("EMBEDDING_API_KEY")

@@ -1,6 +1,10 @@
 daily_top_n: 10
 languages: null        # null=全部;或 [Python, Rust, TypeScript]
 semantic_top_k: 10
-embedding_model: "BAAI/bge-m3"
+embedding_model: "BAAI/bge-m3"          # Actions 云端采集时用的本地模型
+# 本机语义搜索改用在线 OpenAI 兼容 embedding 服务(留空 "" 则回退本地模型)
+# key 放在 .env 的 EMBEDDING_API_KEY(已被 .gitignore 忽略)
+embedding_api_base: "http://10.0.0.1:7000/v1"
+embedding_api_model: "bge-m3"
 trending_since: "daily"
 data_dir: "data"

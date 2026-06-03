@@ -10,6 +10,8 @@ def test_load_config_reads_yaml(tmp_path):
         languages: [Python, Rust]
         semantic_top_k: 3
         embedding_model: "test-model"
+        embedding_api_base: "http://svc:7000/v1"
+        embedding_api_model: "bge-m3"
         trending_since: "weekly"
         data_dir: "mydata"
     """))
@@ -18,8 +20,24 @@ def test_load_config_reads_yaml(tmp_path):
     assert cfg.languages == ["Python", "Rust"]
     assert cfg.semantic_top_k == 3
     assert cfg.embedding_model == "test-model"
+    assert cfg.embedding_api_base == "http://svc:7000/v1"
+    assert cfg.embedding_api_model == "bge-m3"
     assert cfg.trending_since == "weekly"
     assert cfg.data_dir == "mydata"
+
+
+def test_embedding_api_base_defaults_empty(tmp_path):
+    p = tmp_path / "config.yaml"
+    p.write_text("daily_top_n: 7\n")
+    cfg = config.load_config(str(p))
+    assert cfg.embedding_api_base == ""
+
+
+def test_get_embedding_api_key_reads_env(monkeypatch):
+    monkeypatch.setenv("EMBEDDING_API_KEY", "sk-test")
+    assert config.get_embedding_api_key() == "sk-test"
+    monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
+    assert config.get_embedding_api_key() is None
 
 
 def test_load_config_uses_defaults_for_missing(tmp_path):
