@@ -46,6 +46,17 @@ def create_app(config: Config, embedder, github_token,
             results.append(p)
         return JSONResponse({"results": results})
 
+    @app.get("/api/library")
+    def library():
+        # 本地语义库 = 每日 trending 采集积累的全部项目
+        projects, _ = store.load(config.data_dir)
+        fav_names = {p["full_name"] for p in store.load(_fav_dir(config))[0]}
+        for p in projects:
+            p["favorited"] = p["full_name"] in fav_names
+        # 按收录时间(first_seen)倒序,其次 star 倒序
+        projects.sort(key=lambda p: (p.get("first_seen", ""), p.get("stars", 0)), reverse=True)
+        return JSONResponse({"results": projects})
+
     @app.get("/api/favorites")
     def favorites():
         projects, _ = store.load(_fav_dir(config))

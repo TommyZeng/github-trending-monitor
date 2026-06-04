@@ -151,6 +151,7 @@
 
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="search" role="tab">搜索</button>
+      <button class="tab" data-tab="library" role="tab">项目库<span class="count" id="lib-count"></span></button>
       <button class="tab" data-tab="favorites" role="tab">收藏<span class="count" id="fav-count"></span></button>
     </nav>
 
@@ -170,6 +171,12 @@
       <main class="grid" id="results"></main>
     </section>
 
+    <!-- 项目库(每日 trending 积累的全部项目) -->
+    <section id="tab-library" class="hidden">
+      <p class="status" id="lib-status" aria-live="polite"></p>
+      <main class="grid" id="lib-results"></main>
+    </section>
+
     <!-- 收藏 -->
     <section id="tab-favorites" class="hidden">
       <p class="status" id="fav-status" aria-live="polite"></p>
@@ -183,19 +190,23 @@
     const statusEl = document.getElementById('status');
     const favBox = document.getElementById('fav-results');
     const favStatus = document.getElementById('fav-status');
+    const libBox = document.getElementById('lib-results');
+    const libStatus = document.getElementById('lib-status');
     const modeLabel = { semantic: '本地语义', realtime: '实时语义', keyword: 'GitHub 关键词' };
     let currentMode = 'semantic';
-    let lastResults = [];
-    let favLoaded = false;
+    const lists = { search: [], library: [] };   // 每个 tab 各自的结果集
+    let favLoaded = false, libLoaded = false;
 
     const esc = s => (s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
-    function card(p, i, dateLabel) {
+    function card(p, i, opts = {}) {
+      const { list, dateLabel } = opts;
       const [owner, repo] = (p.full_name || '').split('/');
       const name = repo ? `<span class="owner">${esc(owner)}/</span>${esc(repo)}` : esc(p.full_name);
+      const fid = list ? `${list}-${i}` : '';
       const fav = p.favorited
         ? '<span class="fav-badge">★ 已收藏</span>'
-        : `<button class="fav-btn" id="fav-${i}" onclick="favorite(${i})">收藏</button>`;
+        : (list ? `<button class="fav-btn" id="fav-${fid}" onclick="favorite('${list}',${i})">收藏</button>` : '');
       const score = p.score != null ? `<span class="score">相似度 ${p.score.toFixed(3)}</span>` : '';
       const lang = p.language ? `<span class="lang"><span class="swatch"></span>${esc(p.language)}</span><span class="dot"></span>` : '';
       const when = (dateLabel && p.first_seen) ? `<span class="dot"></span><span class="when">${dateLabel} ${esc(p.first_seen)}</span>` : '';
@@ -225,9 +236,10 @@
     /* ---- Tabs ---- */
     function switchTab(name) {
       document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-      document.getElementById('tab-search').classList.toggle('hidden', name !== 'search');
-      document.getElementById('tab-favorites').classList.toggle('hidden', name !== 'favorites');
+      ['search', 'library', 'favorites'].forEach(n =>
+        document.getElementById('tab-' + n).classList.toggle('hidden', n !== name));
       if (name === 'favorites') loadFavorites();
+      if (name === 'library') loadLibrary();
     }
     document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
@@ -249,30 +261,30 @@
       try {
         const r = await fetch(`/api/${currentMode}?q=` + encodeURIComponent(q));
         const data = await r.json();
-        lastResults = data.results || [];
-        if (!lastResults.length) {
+        lists.search = data.results || [];
+        if (!lists.search.length) {
           statusEl.textContent = '';
           box.innerHTML = emptyBox('∅', data.error || '没有找到相关项目', !!data.error);
           return;
         }
-        statusEl.textContent = `${modeLabel[currentMode]} · ${lastResults.length} 个结果`;
-        box.innerHTML = lastResults.map((p, i) => card(p, i)).join('');
+        statusEl.textContent = `${modeLabel[currentMode]} · ${lists.search.length} 个结果`;
+        box.innerHTML = lists.search.map((p, i) => card(p, i, { list: 'search' })).join('');
       } catch (e) {
         statusEl.textContent = '';
         box.innerHTML = emptyBox('⚠', '请求失败,请重试', true);
       }
     }
-    async function favorite(i) {
-      const btn = document.getElementById('fav-' + i);
+    async function favorite(list, i) {
+      const btn = document.getElementById('fav-' + list + '-' + i);
       if (btn) { btn.disabled = true; btn.textContent = '收藏中…'; }
       try {
         const r = await fetch('/api/favorite', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lastResults[i]),
+          body: JSON.stringify(lists[list][i]),
         });
         const d = await r.json();
         if (btn) { btn.textContent = d.ok ? '★ 已收藏' : '收藏失败'; if (d.ok) { btn.className = 'fav-badge'; btn.disabled = true; } }
-        favLoaded = false;  // 让收藏页下次刷新
+        favLoaded = false; libLoaded = false;  // 收藏页/项目库下次刷新以反映收藏态
       } catch (e) { if (btn) { btn.disabled = false; btn.textContent = '重试收藏'; } }
     }
 
@@ -288,13 +300,31 @@
         document.getElementById('fav-count').textContent = items.length ? `(${items.length})` : '';
         if (!items.length) { favStatus.textContent = ''; favBox.innerHTML = emptyBox('☆', '还没有收藏。去“搜索”里点项目卡片上的「收藏」吧。'); return; }
         favStatus.textContent = `已收藏 ${items.length} 个项目 · 按收藏时间排序`;
-        favBox.innerHTML = items.map(p => card(p, -1, '收藏于')).join('');
+        favBox.innerHTML = items.map(p => card(p, -1, { dateLabel: '收藏于' })).join('');
       } catch (e) { favStatus.textContent = ''; favBox.innerHTML = emptyBox('⚠', '加载收藏失败,请重试', true); }
+    }
+
+    /* ---- Library(本地语义库:每日 trending 积累的全部项目) ---- */
+    async function loadLibrary(force) {
+      if (libLoaded && !force) return;
+      libStatus.textContent = '加载中…';
+      skeleton(libBox);
+      try {
+        const r = await fetch('/api/library');
+        const items = (await r.json()).results || [];
+        lists.library = items;
+        libLoaded = true;
+        document.getElementById('lib-count').textContent = items.length ? `(${items.length})` : '';
+        if (!items.length) { libStatus.textContent = ''; libBox.innerHTML = emptyBox('▦', '项目库还是空的。等每日 trending 采集运行后这里就会有项目。'); return; }
+        libStatus.textContent = `本地语义库共 ${items.length} 个项目 · 按收录时间排序`;
+        libBox.innerHTML = items.map((p, i) => card(p, i, { list: 'library', dateLabel: '收录于' })).join('');
+      } catch (e) { libStatus.textContent = ''; libBox.innerHTML = emptyBox('⚠', '加载项目库失败,请重试', true); }
     }
 
     // 分享链接:/?q=...&mode=... 预填并自动搜索;?tab=favorites 直接打开收藏页
     const params = new URLSearchParams(location.search);
-    if (params.get('tab') === 'favorites') switchTab('favorites');
+    const ptab = params.get('tab');
+    if (ptab === 'favorites' || ptab === 'library') switchTab(ptab);
     const pm = params.get('mode'); if (pm && modeLabel[pm]) setMode(pm);
     const pq = params.get('q'); if (pq) { qEl.value = pq; run(); } else { qEl.focus(); }
   </script>

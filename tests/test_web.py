@@ -135,6 +135,31 @@ def test_favorites_list_empty(tmp_path):
     assert client.get("/api/favorites").json()["results"] == []
 
 
+def test_library_lists_trending_and_marks_favorited(tmp_path):
+    # 往主库(trending)放两个项目
+    projects, embs = store.load(str(tmp_path))
+    items = [
+        {"full_name": "a/x", "url": "u", "description": "d", "stars": 5,
+         "language": "Go", "topics": [], "readme_excerpt": ""},
+        {"full_name": "b/y", "url": "u", "description": "d", "stars": 9,
+         "language": "Rust", "topics": [], "readme_excerpt": ""},
+    ]
+    vecs = np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    projects, embs = store.upsert(projects, embs, items, vecs, "2026-06-04")
+    store.save(str(tmp_path), projects, embs)
+
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    # 收藏其中一个
+    client.post("/api/favorite", json=items[0])
+
+    results = client.get("/api/library").json()["results"]
+    assert {p["full_name"] for p in results} == {"a/x", "b/y"}
+    by_name = {p["full_name"]: p for p in results}
+    assert by_name["a/x"]["favorited"] is True      # 已收藏的被标记
+    assert by_name["b/y"]["favorited"] is False
+
+
 def test_favorite_requires_full_name(tmp_path):
     app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
     client = TestClient(app)
