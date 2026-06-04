@@ -21,6 +21,11 @@ def _build_block(items: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _clean(s: str) -> str:
+    # 小模型有时把输入序号写进摘要(如 "1. xxx"),去掉开头的列表编号
+    return re.sub(r"^\s*\d+\s*[.、)]\s*", "", s).strip()
+
+
 def _parse_array(content: str) -> list[str] | None:
     text = content.strip()
     text = re.sub(r"^```[a-zA-Z]*\s*|\s*```$", "", text).strip()
@@ -63,6 +68,7 @@ def add_summaries(items: list[dict], api_base: str, model: str,
     summaries = _parse_array(content)
     if summaries:
         for item, s in zip(items, summaries):
+            s = _clean(s)
             if s:
                 item["summary_zh"] = s
     return items

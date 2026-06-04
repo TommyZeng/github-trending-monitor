@@ -38,6 +38,14 @@ def test_add_summaries_strips_code_fence():
     assert out[0]["summary_zh"] == "摘要1"
 
 
+def test_add_summaries_strips_leading_list_number():
+    # 小模型可能把序号写进摘要
+    sess = _Session('["1. 快速命令行工具", "2、另一个项目"]')
+    out = summarizer.add_summaries(_items(), "http://llm/v1", "m", session=sess)
+    assert out[0]["summary_zh"] == "快速命令行工具"
+    assert out[1]["summary_zh"] == "另一个项目"
+
+
 def test_add_summaries_returns_items_unchanged_on_error():
     class _Boom:
         def post(self, *a, **k): raise RuntimeError("down")
