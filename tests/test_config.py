@@ -33,6 +33,32 @@ def test_embedding_api_base_defaults_empty(tmp_path):
     assert cfg.embedding_api_base == ""
 
 
+def test_summary_llm_can_be_separate(tmp_path):
+    p = tmp_path / "config.yaml"
+    p.write_text(textwrap.dedent("""
+        llm_api_base: "https://deepseek/v1"
+        llm_model: "deepseek-v4-flash"
+        summary_api_base: "http://10.0.0.1:8001/v1"
+        summary_model: "qwen3.5-0.8b"
+    """))
+    cfg = config.load_config(str(p))
+    assert cfg.llm_api_base == "https://deepseek/v1"
+    assert cfg.summary_api_base == "http://10.0.0.1:8001/v1"
+    assert cfg.summary_model == "qwen3.5-0.8b"
+
+
+def test_summary_defaults_empty(tmp_path):
+    cfg = config.load_config(str(tmp_path / "nope.yaml"))
+    assert cfg.summary_api_base == "" and cfg.summary_model == ""
+
+
+def test_get_summary_api_key_reads_env(monkeypatch):
+    monkeypatch.setenv("SUMMARY_API_KEY", "sk-s")
+    assert config.get_summary_api_key() == "sk-s"
+    monkeypatch.delenv("SUMMARY_API_KEY", raising=False)
+    assert config.get_summary_api_key() is None
+
+
 def test_get_embedding_api_key_reads_env(monkeypatch):
     monkeypatch.setenv("EMBEDDING_API_KEY", "sk-test")
     assert config.get_embedding_api_key() == "sk-test"

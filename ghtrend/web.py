@@ -78,7 +78,7 @@ def create_app(config: Config, embedder, github_token,
 def main() -> None:
     import uvicorn
     from .config import (load_config, get_github_token, get_embedding_api_key,
-                         get_llm_api_key, get_reranker_api_key)
+                         get_llm_api_key, get_reranker_api_key, get_summary_api_key)
     from .embedder import Embedder, RemoteEmbedder
     from . import realtime_search, summarizer
     cfg = load_config()
@@ -101,11 +101,15 @@ def main() -> None:
     else:
         print("实时语义搜索未启用(未配置 llm_api_base / reranker_api_base)")
 
+    # 摘要可用独立 LLM(summary_api_base),否则沿用关键词那套(llm_api_base)
+    summary_base = cfg.summary_api_base or cfg.llm_api_base
+    summary_model = cfg.summary_model or cfg.llm_model
+    summary_key = get_summary_api_key() if cfg.summary_api_base else llm_key
     summarize_fn = None
-    if cfg.llm_api_base:
+    if summary_base:
         summarize_fn = lambda items: summarizer.add_summaries(
-            items, cfg.llm_api_base, cfg.llm_model, api_key=llm_key)
-        print(f"GitHub 搜索结果中文摘要已启用: {cfg.llm_model}")
+            items, summary_base, summary_model, api_key=summary_key)
+        print(f"GitHub 搜索结果中文摘要已启用: {summary_model} @ {summary_base}")
 
     app = create_app(cfg, embedder, github_token,
                      realtime_fn=realtime_fn, summarize_fn=summarize_fn)

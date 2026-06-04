@@ -16,6 +16,9 @@ class Config:
     # 实时 GitHub 语义搜索:LLM 提关键词 + reranker 重排(留空 llm_api_base 则禁用该模式)
     llm_api_base: str = ""
     llm_model: str = "deepseek-v4-flash"
+    # 摘要可单独指定 LLM(留空则沿用 llm_api_base / llm_model)
+    summary_api_base: str = ""
+    summary_model: str = ""
     reranker_api_base: str = ""
     reranker_model: str = "bge-reranker-v2-m3"
     realtime_per_keyword: int = 10
@@ -55,3 +58,7 @@ def get_llm_api_key() -> str | None:
 
 def get_reranker_api_key() -> str | None:
     return os.environ.get("RERANKER_API_KEY")
+
+
+def get_summary_api_key() -> str | None:
+    return os.environ.get("SUMMARY_API_KEY")
