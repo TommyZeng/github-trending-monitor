@@ -4,155 +4,140 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GitHub 热门项目搜索</title>
-  <meta name="description" content="GitHub 热门项目语义搜索 · 本地库 / 实时全站 / 关键词">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230d0f13'/%3E%3Cpath d='M16 7l2.6 5.6L24.5 13l-4.5 4 1.2 6L16 20.2 10.8 23l1.2-6-4.5-4 5.9-.4z' fill='%23d9a85c'/%3E%3C/svg%3E">
+  <meta name="description" content="GitHub 热门项目语义搜索 · 本地库 / 实时全站 / 关键词 / 收藏">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f5f4f1'/%3E%3Cpath d='M16 7l2.6 5.6L24.5 13l-4.5 4 1.2 6L16 20.2 10.8 23l1.2-6-4.5-4 5.9-.4z' fill='%239a6b1f'/%3E%3C/svg%3E">
   <style>
     :root {
-      --bg: #0d0f13;
-      --bg-elev: #15181e;
-      --bg-elev-2: #1b1f27;
-      --border: rgba(255,255,255,.07);
-      --border-strong: rgba(255,255,255,.13);
-      --text: #e8eaed;
-      --text-dim: #9099a3;
-      --text-faint: #6b727c;
-      --accent: #d9a85c;
-      --accent-soft: rgba(217,168,92,.14);
-      --accent-line: rgba(217,168,92,.35);
+      --bg: #f5f4f1;
+      --bg-elev: #ffffff;
+      --bg-elev-2: #f0eee9;
+      --border: rgba(20,20,20,.09);
+      --border-strong: rgba(20,20,20,.17);
+      --text: #1b1e22;
+      --text-dim: #5c636c;
+      --text-faint: #969ca4;
+      --accent: #9a6b1f;
+      --accent-soft: rgba(154,107,31,.10);
+      --accent-line: rgba(154,107,31,.32);
       --radius: 14px;
-      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px -12px rgba(5,8,14,.7);
-      --shadow-hover: 0 2px 4px rgba(0,0,0,.4), 0 22px 48px -16px rgba(8,12,22,.85);
+      --shadow: 0 1px 2px rgba(28,24,18,.05), 0 10px 28px -14px rgba(40,34,24,.22);
+      --shadow-hover: 0 2px 6px rgba(28,24,18,.07), 0 20px 42px -18px rgba(40,34,24,.32);
       --mono: "SF Mono","JetBrains Mono","Fira Code",ui-monospace,"Cascadia Code",Consolas,monospace;
       --sans: "Segoe UI",system-ui,-apple-system,"Noto Sans CJK SC","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
-      font-family: var(--sans);
-      color: var(--text);
-      background: var(--bg);
-      margin: 0;
-      min-height: 100dvh;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
+      font-family: var(--sans); color: var(--text); background: var(--bg);
+      margin: 0; min-height: 100dvh; line-height: 1.6; -webkit-font-smoothing: antialiased;
     }
-    /* 环境光 + 微噪点纹理 */
     body::before {
       content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
       background:
-        radial-gradient(900px 480px at 50% -8%, rgba(217,168,92,.10), transparent 70%),
-        radial-gradient(700px 500px at 12% 0%, rgba(90,110,150,.07), transparent 65%);
+        radial-gradient(900px 460px at 50% -10%, rgba(154,107,31,.07), transparent 70%),
+        radial-gradient(700px 480px at 88% 0%, rgba(120,140,170,.06), transparent 65%);
     }
     body::after {
-      content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .035;
+      content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .02;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
-    .wrap { max-width: 880px; margin: 0 auto; padding: clamp(2.5rem, 7vw, 5rem) 1.25rem 5rem; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: clamp(2.5rem, 7vw, 4.5rem) 1.25rem 5rem; }
 
-    header { margin-bottom: 2.25rem; }
+    header { margin-bottom: 1.5rem; }
     .brand { display: flex; align-items: center; gap: .65rem; }
     .brand .mark {
       width: 30px; height: 30px; border-radius: 9px; flex: none;
-      background: linear-gradient(150deg, #20242d, #11141a);
-      border: 1px solid var(--border-strong);
-      display: grid; place-items: center; color: var(--accent); font-size: 16px;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+      background: linear-gradient(150deg, #ffffff, #efece5);
+      border: 1px solid var(--border-strong); display: grid; place-items: center;
+      color: var(--accent); font-size: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.05);
     }
-    h1 {
-      font-size: clamp(1.55rem, 3.6vw, 2.15rem);
-      letter-spacing: -.02em; font-weight: 650; margin: 0; line-height: 1.12;
-    }
-    .sub { color: var(--text-dim); font-size: .95rem; margin: .55rem 0 0; max-width: 56ch; }
+    h1 { font-size: clamp(1.5rem, 3.4vw, 2.05rem); letter-spacing: -.02em; font-weight: 650; margin: 0; line-height: 1.12; }
+    .sub { color: var(--text-dim); font-size: .95rem; margin: .5rem 0 0; max-width: 56ch; }
 
-    /* 搜索区 */
-    .search { margin-bottom: 1.75rem; }
+    /* Tabs */
+    .tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--border); margin-bottom: 1.6rem; }
+    .tab {
+      cursor: pointer; font-family: var(--sans); font-size: .95rem; color: var(--text-dim);
+      background: none; border: 0; padding: .65rem .25rem; margin-right: 1.4rem;
+      border-bottom: 2px solid transparent; transition: color .18s, border-color .18s; position: relative; top: 1px;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); border-color: var(--accent); font-weight: 600; }
+    .tab .count { font-family: var(--mono); font-size: .72rem; color: var(--text-faint); margin-left: .35rem; }
+    .tab:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); border-radius: 6px; }
+
     .field {
-      display: flex; align-items: center; gap: .7rem;
-      background: var(--bg-elev); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: .15rem .9rem .15rem 1rem;
+      display: flex; align-items: center; gap: .7rem; background: var(--bg-elev);
+      border: 1px solid var(--border); border-radius: var(--radius); padding: .15rem .9rem .15rem 1rem;
       box-shadow: var(--shadow); transition: border-color .2s, box-shadow .2s;
     }
     .field:focus-within { border-color: var(--accent-line); box-shadow: var(--shadow), 0 0 0 3px var(--accent-soft); }
     .field svg { flex: none; color: var(--text-faint); }
-    #q {
-      flex: 1; background: transparent; border: 0; outline: none;
-      color: var(--text); font-family: var(--sans); font-size: 1.02rem; padding: .85rem 0;
-    }
+    #q { flex: 1; background: transparent; border: 0; outline: none; color: var(--text);
+      font-family: var(--sans); font-size: 1.02rem; padding: .85rem 0; }
     #q::placeholder { color: var(--text-faint); }
-    .go {
-      flex: none; border: 0; cursor: pointer; border-radius: 9px;
-      background: var(--accent); color: #1a1407; font-weight: 650; font-size: .9rem;
-      padding: .5rem .95rem; transition: filter .18s, transform .08s;
-    }
-    .go:hover { filter: brightness(1.07); }
+    .go { flex: none; border: 0; cursor: pointer; border-radius: 9px; background: var(--text);
+      color: #fff; font-weight: 600; font-size: .9rem; padding: .55rem .95rem; transition: filter .18s, transform .08s; }
+    .go:hover { filter: brightness(1.18); }
     .go:active { transform: scale(.97); }
 
     .modes { display: flex; gap: .4rem; margin-top: .8rem; flex-wrap: wrap; }
-    .mode {
-      cursor: pointer; font-family: var(--sans); font-size: .85rem; color: var(--text-dim);
+    .mode { cursor: pointer; font-family: var(--sans); font-size: .85rem; color: var(--text-dim);
       background: var(--bg-elev); border: 1px solid var(--border); border-radius: 999px;
-      padding: .42rem .9rem; transition: color .18s, border-color .18s, background .18s, transform .08s;
-    }
+      padding: .42rem .9rem; transition: color .18s, border-color .18s, background .18s, transform .08s; }
     .mode:hover { color: var(--text); border-color: var(--border-strong); }
     .mode:active { transform: scale(.97); }
-    .mode.active {
-      color: var(--accent); border-color: var(--accent-line);
-      background: var(--accent-soft); font-weight: 600;
-    }
+    .mode.active { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); font-weight: 600; }
     .mode:focus-visible, .go:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 
-    /* 结果区 */
     .status { color: var(--text-faint); font-size: .82rem; font-family: var(--mono);
-      letter-spacing: .02em; margin: 0 .15rem 1rem; min-height: 1.1em; }
+      letter-spacing: .02em; margin: 1.2rem .15rem 1rem; min-height: 1.1em; }
     .grid { display: flex; flex-direction: column; gap: .85rem; }
 
-    .card {
-      position: relative; background: var(--bg-elev); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 1.05rem 1.15rem 1.1rem;
-      box-shadow: var(--shadow); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-    }
+    .card { position: relative; background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.05rem 1.15rem 1.1rem; box-shadow: var(--shadow);
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
     .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); border-color: var(--border-strong); }
     .card-top { display: flex; align-items: flex-start; gap: 1rem; }
-    .name { font-size: 1.06rem; font-weight: 600; letter-spacing: -.01em;
-      color: var(--text); text-decoration: none; word-break: break-word; }
+    .name { font-size: 1.06rem; font-weight: 600; letter-spacing: -.01em; color: var(--text);
+      text-decoration: none; word-break: break-word; }
     .name:hover { color: var(--accent); }
     .name .owner { color: var(--text-dim); font-weight: 500; }
     .spacer { flex: 1; }
 
-    .meta { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap;
-      margin: .55rem 0 .15rem; font-size: .82rem; color: var(--text-dim); }
+    .meta { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin: .55rem 0 .15rem;
+      font-size: .82rem; color: var(--text-dim); }
     .meta .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
     .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-faint); }
     .lang { display: inline-flex; align-items: center; gap: .35rem; }
-    .lang .swatch { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); opacity: .8; }
-    .score { font-family: var(--mono); font-variant-numeric: tabular-nums;
-      color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-line);
-      padding: .05rem .45rem; border-radius: 6px; font-size: .76rem; }
-    .desc { color: #cbd0d6; font-size: .95rem; margin: .5rem 0 .2rem; max-width: 68ch; }
+    .lang .swatch { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); opacity: .85; }
+    .score { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--accent);
+      background: var(--accent-soft); border: 1px solid var(--accent-line); padding: .05rem .45rem; border-radius: 6px; font-size: .76rem; }
+    .when { font-family: var(--mono); color: var(--text-faint); }
+    .desc { color: #353b42; font-size: .95rem; margin: .5rem 0 .2rem; max-width: 68ch; }
     .topics { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .7rem; }
-    .tag { font-family: var(--mono); font-size: .72rem; color: var(--text-dim);
-      background: var(--bg-elev-2); border: 1px solid var(--border); border-radius: 6px; padding: .12rem .42rem; }
+    .tag { font-family: var(--mono); font-size: .72rem; color: var(--text-dim); background: var(--bg-elev-2);
+      border: 1px solid var(--border); border-radius: 6px; padding: .12rem .42rem; }
 
     .fav-btn, .fav-badge { flex: none; font-size: .78rem; border-radius: 8px; padding: .34rem .7rem; white-space: nowrap; }
-    .fav-btn { cursor: pointer; color: var(--text-dim); background: var(--bg-elev-2);
-      border: 1px solid var(--border); font-family: var(--sans); transition: color .18s, border-color .18s, transform .08s; }
+    .fav-btn { cursor: pointer; color: var(--text-dim); background: var(--bg-elev-2); border: 1px solid var(--border);
+      font-family: var(--sans); transition: color .18s, border-color .18s, transform .08s; }
     .fav-btn:hover { color: var(--accent); border-color: var(--accent-line); }
     .fav-btn:active { transform: scale(.95); }
     .fav-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
     .fav-badge { color: var(--accent); border: 1px solid var(--accent-line); background: var(--accent-soft); font-weight: 600; }
 
-    /* 骨架屏 */
     .sk { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.15rem; }
-    .sk-line { height: 11px; border-radius: 5px; background:
-      linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 37%, rgba(255,255,255,.04) 63%);
+    .sk-line { height: 11px; border-radius: 5px;
+      background: linear-gradient(90deg, rgba(0,0,0,.04) 25%, rgba(0,0,0,.08) 37%, rgba(0,0,0,.04) 63%);
       background-size: 400% 100%; animation: shimmer 1.4s ease infinite; }
     @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 
-    /* 空 / 错误态 */
     .empty { text-align: center; padding: 3.5rem 1rem; color: var(--text-faint); }
-    .empty .icon { font-size: 1.8rem; opacity: .5; }
+    .empty .icon { font-size: 1.8rem; opacity: .55; }
     .empty p { margin: .6rem 0 0; font-size: .95rem; }
-    .empty .err { color: #e0a3a3; }
+    .empty .err { color: #b4453d; }
+    .hidden { display: none; }
 
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
   </style>
@@ -160,14 +145,17 @@
 <body>
   <div class="wrap">
     <header>
-      <div class="brand">
-        <span class="mark">★</span>
-        <h1>GitHub 热门项目搜索</h1>
-      </div>
+      <div class="brand"><span class="mark">★</span><h1>GitHub 热门项目搜索</h1></div>
       <p class="sub">在累积的 trending 库、实时全站、或你的收藏中,按语义找到最相关的开源项目。</p>
     </header>
 
-    <section class="search" aria-label="搜索">
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="search" role="tab">搜索</button>
+      <button class="tab" data-tab="favorites" role="tab">收藏<span class="count" id="fav-count"></span></button>
+    </nav>
+
+    <!-- 搜索 -->
+    <section id="tab-search">
       <div class="field">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input id="q" placeholder="输入一句话,如:Rust 写的终端 AI 助手" autocomplete="off" />
@@ -178,22 +166,72 @@
         <button class="mode" data-mode="realtime" role="tab">实时语义</button>
         <button class="mode" data-mode="keyword" role="tab">GitHub 关键词</button>
       </div>
+      <p class="status" id="status" aria-live="polite"></p>
+      <main class="grid" id="results"></main>
     </section>
 
-    <p class="status" id="status" aria-live="polite"></p>
-    <main class="grid" id="results"></main>
+    <!-- 收藏 -->
+    <section id="tab-favorites" class="hidden">
+      <p class="status" id="fav-status" aria-live="polite"></p>
+      <main class="grid" id="fav-results"></main>
+    </section>
   </div>
 
   <script>
     const qEl = document.getElementById('q');
     const box = document.getElementById('results');
     const statusEl = document.getElementById('status');
+    const favBox = document.getElementById('fav-results');
+    const favStatus = document.getElementById('fav-status');
     const modeLabel = { semantic: '本地语义', realtime: '实时语义', keyword: 'GitHub 关键词' };
     let currentMode = 'semantic';
     let lastResults = [];
+    let favLoaded = false;
 
     const esc = s => (s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
+    function card(p, i, dateLabel) {
+      const [owner, repo] = (p.full_name || '').split('/');
+      const name = repo ? `<span class="owner">${esc(owner)}/</span>${esc(repo)}` : esc(p.full_name);
+      const fav = p.favorited
+        ? '<span class="fav-badge">★ 已收藏</span>'
+        : `<button class="fav-btn" id="fav-${i}" onclick="favorite(${i})">收藏</button>`;
+      const score = p.score != null ? `<span class="score">相似度 ${p.score.toFixed(3)}</span>` : '';
+      const lang = p.language ? `<span class="lang"><span class="swatch"></span>${esc(p.language)}</span><span class="dot"></span>` : '';
+      const when = (dateLabel && p.first_seen) ? `<span class="dot"></span><span class="when">${dateLabel} ${esc(p.first_seen)}</span>` : '';
+      const topics = (p.topics || []).slice(0, 8).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+      const desc = p.summary_zh || p.description_zh || p.description || '';
+      return `
+        <article class="card">
+          <div class="card-top">
+            <a class="name" href="${esc(p.url)}" target="_blank" rel="noopener">${name}</a>
+            <span class="spacer"></span>${fav}
+          </div>
+          <div class="meta">${lang}<span class="num">★ ${(p.stars ?? 0).toLocaleString()}</span>${score ? '<span class="dot"></span>' + score : ''}${when}</div>
+          ${desc ? `<p class="desc">${esc(desc)}</p>` : ''}
+          ${topics ? `<div class="topics">${topics}</div>` : ''}
+        </article>`;
+    }
+    function skeleton(el) {
+      el.innerHTML = Array.from({ length: 4 }).map(() => `
+        <div class="sk"><div class="sk-line" style="width:42%;height:14px"></div>
+          <div class="sk-line" style="width:28%;margin-top:.7rem"></div>
+          <div class="sk-line" style="width:88%;margin-top:.9rem"></div>
+          <div class="sk-line" style="width:70%;margin-top:.5rem"></div></div>`).join('');
+    }
+    const emptyBox = (icon, msg, isErr) =>
+      `<div class="empty"><div class="icon">${icon}</div><p class="${isErr ? 'err' : ''}">${esc(msg)}</p></div>`;
+
+    /* ---- Tabs ---- */
+    function switchTab(name) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+      document.getElementById('tab-search').classList.toggle('hidden', name !== 'search');
+      document.getElementById('tab-favorites').classList.toggle('hidden', name !== 'favorites');
+      if (name === 'favorites') loadFavorites();
+    }
+    document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+    /* ---- Search ---- */
     function setMode(m) {
       currentMode = m;
       document.querySelectorAll('.mode').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
@@ -203,60 +241,27 @@
     document.getElementById('go').addEventListener('click', run);
     qEl.addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
 
-    function skeleton() {
-      box.innerHTML = Array.from({ length: 4 }).map(() => `
-        <div class="sk">
-          <div class="sk-line" style="width:42%;height:14px"></div>
-          <div class="sk-line" style="width:28%;margin-top:.7rem"></div>
-          <div class="sk-line" style="width:88%;margin-top:.9rem"></div>
-          <div class="sk-line" style="width:70%;margin-top:.5rem"></div>
-        </div>`).join('');
-    }
-
-    function card(p, i) {
-      const [owner, repo] = (p.full_name || '').split('/');
-      const name = repo ? `<span class="owner">${esc(owner)}/</span>${esc(repo)}` : esc(p.full_name);
-      const fav = p.favorited
-        ? '<span class="fav-badge">★ 已收藏</span>'
-        : `<button class="fav-btn" id="fav-${i}" onclick="favorite(${i})">收藏</button>`;
-      const score = p.score != null ? `<span class="score">相似度 ${p.score.toFixed(3)}</span>` : '';
-      const lang = p.language ? `<span class="lang"><span class="swatch"></span>${esc(p.language)}</span><span class="dot"></span>` : '';
-      const topics = (p.topics || []).slice(0, 8).map(t => `<span class="tag">${esc(t)}</span>`).join('');
-      const desc = p.summary_zh || p.description_zh || p.description || '';
-      return `
-        <article class="card">
-          <div class="card-top">
-            <a class="name" href="${esc(p.url)}" target="_blank" rel="noopener">${name}</a>
-            <span class="spacer"></span>${fav}
-          </div>
-          <div class="meta">${lang}<span class="num">★ ${(p.stars ?? 0).toLocaleString()}</span>${score ? '<span class="dot"></span>' + score : ''}</div>
-          ${desc ? `<p class="desc">${esc(desc)}</p>` : ''}
-          ${topics ? `<div class="topics">${topics}</div>` : ''}
-        </article>`;
-    }
-
     async function run() {
       const q = qEl.value.trim();
       if (!q) { qEl.focus(); return; }
       statusEl.textContent = `${modeLabel[currentMode]} · 搜索中…`;
-      skeleton();
+      skeleton(box);
       try {
         const r = await fetch(`/api/${currentMode}?q=` + encodeURIComponent(q));
         const data = await r.json();
         lastResults = data.results || [];
         if (!lastResults.length) {
           statusEl.textContent = '';
-          box.innerHTML = `<div class="empty"><div class="icon">∅</div><p class="${data.error ? 'err' : ''}">${esc(data.error || '没有找到相关项目')}</p></div>`;
+          box.innerHTML = emptyBox('∅', data.error || '没有找到相关项目', !!data.error);
           return;
         }
         statusEl.textContent = `${modeLabel[currentMode]} · ${lastResults.length} 个结果`;
-        box.innerHTML = lastResults.map(card).join('');
+        box.innerHTML = lastResults.map((p, i) => card(p, i)).join('');
       } catch (e) {
         statusEl.textContent = '';
-        box.innerHTML = `<div class="empty"><div class="icon">⚠</div><p class="err">请求失败,请重试</p></div>`;
+        box.innerHTML = emptyBox('⚠', '请求失败,请重试', true);
       }
     }
-
     async function favorite(i) {
       const btn = document.getElementById('fav-' + i);
       if (btn) { btn.disabled = true; btn.textContent = '收藏中…'; }
@@ -266,19 +271,32 @@
           body: JSON.stringify(lastResults[i]),
         });
         const d = await r.json();
-        if (btn) {
-          btn.textContent = d.ok ? '★ 已收藏' : '收藏失败';
-          if (d.ok) { btn.className = 'fav-badge'; btn.disabled = true; }
-        }
+        if (btn) { btn.textContent = d.ok ? '★ 已收藏' : '收藏失败'; if (d.ok) { btn.className = 'fav-badge'; btn.disabled = true; } }
+        favLoaded = false;  // 让收藏页下次刷新
       } catch (e) { if (btn) { btn.disabled = false; btn.textContent = '重试收藏'; } }
     }
 
-    // 支持分享链接:/?q=查询&mode=semantic|realtime|keyword 预填并自动搜索
+    /* ---- Favorites ---- */
+    async function loadFavorites(force) {
+      if (favLoaded && !force) return;
+      favStatus.textContent = '加载中…';
+      skeleton(favBox);
+      try {
+        const r = await fetch('/api/favorites');
+        const items = (await r.json()).results || [];
+        favLoaded = true;
+        document.getElementById('fav-count').textContent = items.length ? `(${items.length})` : '';
+        if (!items.length) { favStatus.textContent = ''; favBox.innerHTML = emptyBox('☆', '还没有收藏。去“搜索”里点项目卡片上的「收藏」吧。'); return; }
+        favStatus.textContent = `已收藏 ${items.length} 个项目 · 按收藏时间排序`;
+        favBox.innerHTML = items.map(p => card(p, -1, '收藏于')).join('');
+      } catch (e) { favStatus.textContent = ''; favBox.innerHTML = emptyBox('⚠', '加载收藏失败,请重试', true); }
+    }
+
+    // 分享链接:/?q=...&mode=... 预填并自动搜索;?tab=favorites 直接打开收藏页
     const params = new URLSearchParams(location.search);
-    const pm = params.get('mode');
-    if (pm && modeLabel[pm]) setMode(pm);
-    const pq = params.get('q');
-    if (pq) { qEl.value = pq; run(); } else { qEl.focus(); }
+    if (params.get('tab') === 'favorites') switchTab('favorites');
+    const pm = params.get('mode'); if (pm && modeLabel[pm]) setMode(pm);
+    const pq = params.get('q'); if (pq) { qEl.value = pq; run(); } else { qEl.focus(); }
   </script>
 </body>
 </html>

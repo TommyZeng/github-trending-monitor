@@ -118,6 +118,23 @@ def test_favorite_then_semantic_finds_it(tmp_path):
     assert any(p["full_name"] == "fav/repo" and p.get("favorited") for p in results)
 
 
+def test_favorites_list_returns_saved(tmp_path):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    client.post("/api/favorite", json={"full_name": "a/one", "url": "u", "description": "d", "topics": []})
+    client.post("/api/favorite", json={"full_name": "b/two", "url": "u", "description": "d", "topics": []})
+    r = client.get("/api/favorites")
+    results = r.json()["results"]
+    assert {p["full_name"] for p in results} == {"a/one", "b/two"}
+    assert all(p["favorited"] for p in results)
+
+
+def test_favorites_list_empty(tmp_path):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    assert client.get("/api/favorites").json()["results"] == []
+
+
 def test_favorite_requires_full_name(tmp_path):
     app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
     client = TestClient(app)

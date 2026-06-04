@@ -46,6 +46,15 @@ def create_app(config: Config, embedder, github_token,
             results.append(p)
         return JSONResponse({"results": results})
 
+    @app.get("/api/favorites")
+    def favorites():
+        projects, _ = store.load(_fav_dir(config))
+        for p in projects:
+            p["favorited"] = True
+        # 按收藏时间(first_seen)倒序,其次 star 倒序
+        projects.sort(key=lambda p: (p.get("first_seen", ""), p.get("stars", 0)), reverse=True)
+        return JSONResponse({"results": projects})
+
     @app.post("/api/favorite")
     def favorite(project: dict = Body(...)):
         fn = project.get("full_name")
