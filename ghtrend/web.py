@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from . import store, github_enricher
+from . import store, github_enricher, trending_fetcher
 from .config import Config
 from .embedder import build_text
 
@@ -45,6 +45,19 @@ def create_app(config: Config, embedder, github_token,
             p["score"] = score
             results.append(p)
         return JSONResponse({"results": results})
+
+    _SINCE = {"daily", "weekly", "monthly"}
+
+    @app.get("/api/leaderboard")
+    def leaderboard(since: str = "daily", language: str = ""):
+        if since not in _SINCE:
+            since = "daily"
+        try:
+            items = trending_fetcher.fetch_trending(since=since, language=language or None)
+        except Exception:
+            return JSONResponse({"results": [], "since": since, "error": "拉取 GitHub trending 失败,请重试"})
+        items.sort(key=lambda p: p.get("stars_today") or 0, reverse=True)
+        return JSONResponse({"results": _summarize(items), "since": since})
 
     @app.get("/api/library")
     def library():

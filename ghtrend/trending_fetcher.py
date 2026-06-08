@@ -17,6 +17,11 @@ def _stars_in_period(article) -> int | None:
     return int(m.group(1).replace(",", "")) if m else None
 
 
+def _int(text: str | None) -> int:
+    m = re.search(r"[\d,]+", text or "")
+    return int(m.group().replace(",", "")) if m else 0
+
+
 def parse_trending(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
     items = []
@@ -27,9 +32,15 @@ def parse_trending(html: str) -> list[dict]:
         full_name = a["href"].strip("/")
         if full_name.count("/") != 1:
             continue
+        desc_el = article.select_one("p")
+        lang_el = article.select_one('[itemprop="programmingLanguage"]')
+        stars_el = article.select_one('a[href$="/stargazers"]')
         items.append({
             "full_name": full_name,
             "url": f"https://github.com/{full_name}",
+            "description": desc_el.get_text(strip=True) if desc_el else None,
+            "language": lang_el.get_text(strip=True) if lang_el else None,
+            "stars": _int(stars_el.get_text()) if stars_el else 0,
             "stars_today": _stars_in_period(article),
         })
     return items

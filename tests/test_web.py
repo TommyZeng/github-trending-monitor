@@ -135,6 +135,34 @@ def test_favorites_list_empty(tmp_path):
     assert client.get("/api/favorites").json()["results"] == []
 
 
+def test_leaderboard_sorts_by_period_stars(tmp_path, monkeypatch):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    captured = {}
+    def fake_fetch(since="daily", language=None, session=None):
+        captured["since"] = since; captured["language"] = language
+        return [
+            {"full_name": "a/x", "url": "u", "description": "d", "language": "Go",
+             "stars": 100, "stars_today": 50},
+            {"full_name": "b/y", "url": "u", "description": "d", "language": "Rust",
+             "stars": 999, "stars_today": 300},
+        ]
+    monkeypatch.setattr(web.trending_fetcher, "fetch_trending", fake_fetch)
+    client = TestClient(app)
+    r = client.get("/api/leaderboard", params={"since": "weekly", "language": "rust"})
+    body = r.json()
+    assert captured["since"] == "weekly" and captured["language"] == "rust"
+    # 按 period star(stars_today)降序:b/y(300) 在 a/x(50) 前
+    assert [p["full_name"] for p in body["results"]] == ["b/y", "a/x"]
+
+
+def test_leaderboard_bad_since_defaults_daily(tmp_path, monkeypatch):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    monkeypatch.setattr(web.trending_fetcher, "fetch_trending",
+                        lambda since="daily", language=None, session=None: [])
+    client = TestClient(app)
+    assert client.get("/api/leaderboard", params={"since": "bogus"}).json()["since"] == "daily"
+
+
 def test_library_lists_trending_and_marks_favorited(tmp_path):
     # 往主库(trending)放两个项目
     projects, embs = store.load(str(tmp_path))

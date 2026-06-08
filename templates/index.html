@@ -138,6 +138,14 @@
     .empty p { margin: .6rem 0 0; font-size: .95rem; }
     .empty .err { color: #b4453d; }
     .hidden { display: none; }
+    .lb-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: .4rem; }
+    .lb-bar .modes { margin-top: 0; }
+    #lb-lang { font-family: var(--sans); font-size: .85rem; color: var(--text); background: var(--bg-elev);
+      border: 1px solid var(--border); border-radius: 999px; padding: .42rem .8rem; cursor: pointer; }
+    #lb-lang:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+    .rank { flex: none; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: .8rem;
+      color: var(--text-faint); min-width: 1.6rem; text-align: right; padding-top: .15rem; }
+    .card-top.ranked { align-items: baseline; }
 
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
   </style>
@@ -151,6 +159,7 @@
 
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="search" role="tab">搜索</button>
+      <button class="tab" data-tab="leaderboard" role="tab">榜单</button>
       <button class="tab" data-tab="library" role="tab">项目库<span class="count" id="lib-count"></span></button>
       <button class="tab" data-tab="favorites" role="tab">收藏<span class="count" id="fav-count"></span></button>
     </nav>
@@ -169,6 +178,33 @@
       </div>
       <p class="status" id="status" aria-live="polite"></p>
       <main class="grid" id="results"></main>
+    </section>
+
+    <!-- 榜单(GitHub trending:今天/本周/本月 新增 star 最多) -->
+    <section id="tab-leaderboard" class="hidden">
+      <div class="lb-bar">
+        <div class="modes" id="lb-windows">
+          <button class="mode active" data-since="daily">今天</button>
+          <button class="mode" data-since="weekly">本周</button>
+          <button class="mode" data-since="monthly">本月</button>
+        </div>
+        <select id="lb-lang" aria-label="语言">
+          <option value="">全部语言</option>
+          <option value="python">Python</option>
+          <option value="typescript">TypeScript</option>
+          <option value="javascript">JavaScript</option>
+          <option value="rust">Rust</option>
+          <option value="go">Go</option>
+          <option value="java">Java</option>
+          <option value="c++">C++</option>
+          <option value="c">C</option>
+          <option value="c#">C#</option>
+          <option value="swift">Swift</option>
+          <option value="kotlin">Kotlin</option>
+        </select>
+      </div>
+      <p class="status" id="lb-status" aria-live="polite"></p>
+      <main class="grid" id="lb-results"></main>
     </section>
 
     <!-- 项目库(每日 trending 积累的全部项目) -->
@@ -192,15 +228,18 @@
     const favStatus = document.getElementById('fav-status');
     const libBox = document.getElementById('lib-results');
     const libStatus = document.getElementById('lib-status');
+    const lbBox = document.getElementById('lb-results');
+    const lbStatus = document.getElementById('lb-status');
     const modeLabel = { semantic: '本地语义', realtime: '实时语义', keyword: 'GitHub 关键词' };
-    let currentMode = 'semantic';
-    const lists = { search: [], library: [] };   // 每个 tab 各自的结果集
-    let favLoaded = false, libLoaded = false;
+    const periodLabel = { daily: '今日', weekly: '本周', monthly: '本月' };
+    let currentMode = 'semantic', lbSince = 'daily';
+    const lists = { search: [], library: [], leaderboard: [] };   // 每个 tab 各自的结果集
+    let favLoaded = false, libLoaded = false, lbLoaded = false;
 
     const esc = s => (s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
 
     function card(p, i, opts = {}) {
-      const { list, dateLabel } = opts;
+      const { list, dateLabel, periodLabel = '今日', rank } = opts;
       const [owner, repo] = (p.full_name || '').split('/');
       const name = repo ? `<span class="owner">${esc(owner)}/</span>${esc(repo)}` : esc(p.full_name);
       const fid = list ? `${list}-${i}` : '';
@@ -209,14 +248,15 @@
         : (list ? `<button class="fav-btn" id="fav-${fid}" onclick="favorite('${list}',${i})">收藏</button>` : '');
       const score = p.score != null ? `<span class="score">相似度 ${p.score.toFixed(3)}</span>` : '';
       const lang = p.language ? `<span class="lang"><span class="swatch"></span>${esc(p.language)}</span><span class="dot"></span>` : '';
-      const today = p.stars_today ? `<span class="dot"></span><span class="score">今日 +${p.stars_today.toLocaleString()}</span>` : '';
+      const today = p.stars_today ? `<span class="dot"></span><span class="score">${periodLabel} +${p.stars_today.toLocaleString()}</span>` : '';
       const when = (dateLabel && p.first_seen) ? `<span class="dot"></span><span class="when">${dateLabel} ${esc(p.first_seen)}</span>` : '';
       const topics = (p.topics || []).slice(0, 8).map(t => `<span class="tag">${esc(t)}</span>`).join('');
       const desc = p.summary_zh || p.description_zh || p.description || '';
+      const rankEl = rank ? `<span class="rank">${rank}</span>` : '';
       return `
         <article class="card">
-          <div class="card-top">
-            <a class="name" href="${esc(p.url)}" target="_blank" rel="noopener">${name}</a>
+          <div class="card-top${rank ? ' ranked' : ''}">
+            ${rankEl}<a class="name" href="${esc(p.url)}" target="_blank" rel="noopener">${name}</a>
             <span class="spacer"></span>${fav}
           </div>
           <div class="meta">${lang}<span class="num">★ ${(p.stars ?? 0).toLocaleString()}</span>${today}${score ? '<span class="dot"></span>' + score : ''}${when}</div>
@@ -237,10 +277,11 @@
     /* ---- Tabs ---- */
     function switchTab(name) {
       document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-      ['search', 'library', 'favorites'].forEach(n =>
+      ['search', 'leaderboard', 'library', 'favorites'].forEach(n =>
         document.getElementById('tab-' + n).classList.toggle('hidden', n !== name));
       if (name === 'favorites') loadFavorites();
       if (name === 'library') loadLibrary();
+      if (name === 'leaderboard') loadLeaderboard();
     }
     document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
@@ -322,10 +363,40 @@
       } catch (e) { libStatus.textContent = ''; libBox.innerHTML = emptyBox('⚠', '加载项目库失败,请重试', true); }
     }
 
-    // 分享链接:/?q=...&mode=... 预填并自动搜索;?tab=favorites 直接打开收藏页
+    /* ---- Leaderboard(GitHub trending 预设窗口榜单) ---- */
+    document.querySelectorAll('#lb-windows .mode').forEach(b =>
+      b.addEventListener('click', () => {
+        lbSince = b.dataset.since;
+        document.querySelectorAll('#lb-windows .mode').forEach(x => x.classList.toggle('active', x === b));
+        loadLeaderboard(true);
+      }));
+    document.getElementById('lb-lang').addEventListener('change', () => loadLeaderboard(true));
+
+    async function loadLeaderboard(force) {
+      if (lbLoaded && !force) return;
+      const lang = document.getElementById('lb-lang').value;
+      lbStatus.textContent = `${periodLabel[lbSince]}榜单 · 加载中…`;
+      skeleton(lbBox);
+      try {
+        const r = await fetch('/api/leaderboard?since=' + lbSince + '&language=' + encodeURIComponent(lang));
+        const data = await r.json();
+        lists.leaderboard = data.results || [];
+        lbLoaded = true;
+        if (!lists.leaderboard.length) {
+          lbStatus.textContent = '';
+          lbBox.innerHTML = emptyBox('▦', data.error || '该窗口/语言暂无数据', !!data.error);
+          return;
+        }
+        lbStatus.textContent = `${periodLabel[lbSince]}新增 star 榜 · ${lang || '全部语言'} · ${lists.leaderboard.length} 个`;
+        lbBox.innerHTML = lists.leaderboard.map((p, i) =>
+          card(p, i, { list: 'leaderboard', periodLabel: periodLabel[lbSince], rank: i + 1 })).join('');
+      } catch (e) { lbStatus.textContent = ''; lbBox.innerHTML = emptyBox('⚠', '加载榜单失败,请重试', true); }
+    }
+
+    // 分享链接:/?q=...&mode=... 预填并自动搜索;?tab=favorites/library/leaderboard 直接打开对应页
     const params = new URLSearchParams(location.search);
     const ptab = params.get('tab');
-    if (ptab === 'favorites' || ptab === 'library') switchTab(ptab);
+    if (['favorites', 'library', 'leaderboard'].includes(ptab)) switchTab(ptab);
     const pm = params.get('mode'); if (pm && modeLabel[pm]) setMode(pm);
     const pq = params.get('q'); if (pq) { qEl.value = pq; run(); } else { qEl.focus(); }
   </script>

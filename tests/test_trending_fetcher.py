@@ -26,6 +26,15 @@ def test_parse_trending_stars_today_none_when_absent():
     assert items[0]["stars_today"] is None
 
 
+def test_parse_trending_extracts_meta():
+    items = trending_fetcher.parse_trending(_fixture())
+    assert items[0]["description"] == "A cool project."
+    assert items[0]["language"] == "Python"
+    assert items[0]["stars"] == 12345
+    assert items[1]["language"] == "Rust"
+    assert items[1]["stars"] == 678
+
+
 def test_fetch_trending_uses_session(monkeypatch):
     class _Resp:
         text = _fixture()
