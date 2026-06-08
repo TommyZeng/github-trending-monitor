@@ -15,7 +15,9 @@ def test_run_collects_dedups_and_notifies(tmp_path):
     sent = {}
 
     def fake_fetcher(since, language=None, session=None):
-        return [{"full_name": "a/x", "url": "u"}, {"full_name": "b/y", "url": "u"}]
+        # a/x 今日新增更多(200>10),尽管总 star 更少
+        return [{"full_name": "a/x", "url": "u", "stars_today": 200},
+                {"full_name": "b/y", "url": "u", "stars_today": 10}]
 
     def fake_enricher(full_name, token=None, session=None):
         stars = {"a/x": 50, "b/y": 99}[full_name]
@@ -34,8 +36,9 @@ def test_run_collects_dedups_and_notifies(tmp_path):
     projects, embs = store.load(str(tmp_path))
     assert len(projects) == 2
     assert embs.shape[0] == 2
-    # 推送按 star 降序取 top 2
-    assert sent["names"] == ["b/y", "a/x"]
+    # 推送按「今日新增 star」降序:a/x(200) 在 b/y(10) 之前,即便 a/x 总 star 更少
+    assert sent["names"] == ["a/x", "b/y"]
+    assert all(p["stars_today"] in (200, 10) for p in projects)  # 持久化了今日增量
     assert "2026-06-02" in sent["title"]
     # 每个项目都写入了中文描述
     assert all(p["description_zh"] == "[zh]d" for p in projects)

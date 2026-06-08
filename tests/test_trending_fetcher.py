@@ -14,6 +14,18 @@ def test_parse_trending_extracts_full_names():
     assert items[0]["url"] == "https://github.com/owner-one/repo-one"
 
 
+def test_parse_trending_extracts_stars_today():
+    items = trending_fetcher.parse_trending(_fixture())
+    assert items[0]["stars_today"] == 1234   # "1,234 stars today"
+    assert items[1]["stars_today"] == 56
+
+
+def test_parse_trending_stars_today_none_when_absent():
+    html = '<article class="Box-row"><h2><a href="/a/b">a/b</a></h2></article>'
+    items = trending_fetcher.parse_trending(html)
+    assert items[0]["stars_today"] is None
+
+
 def test_fetch_trending_uses_session(monkeypatch):
     class _Resp:
         text = _fixture()

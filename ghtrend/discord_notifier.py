@@ -9,11 +9,12 @@ def build_payload(projects: list[dict], title: str) -> dict:
         topics = ", ".join(p.get("topics") or [])
         desc = p.get("description_zh") or p.get("description") or "(no description)"
         lang = p.get("language") or "?"
+        today = p.get("stars_today")
+        head = (f"🔥 今日 +{today} · " if today else "") + f"⭐ {p.get('stars', 0)} | {lang}"
         embeds.append({
             "title": p["full_name"],
             "url": p["url"],
-            "description": f"⭐ {p.get('stars', 0)} | {lang}\n{desc}"
-                           + (f"\n`{topics}`" if topics else ""),
+            "description": head + f"\n{desc}" + (f"\n`{topics}`" if topics else ""),
         })
     return {"content": title, "embeds": embeds}
 

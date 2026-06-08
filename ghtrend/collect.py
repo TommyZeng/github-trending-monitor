@@ -20,6 +20,7 @@ def run(config: Config, webhook_url: str, github_token, embedder, today=None,
     for item in raw:
         meta = enricher(item["full_name"], token=github_token)
         if meta:
+            meta["stars_today"] = item.get("stars_today")   # 今日新增 star(来自 trending 页)
             meta["description_zh"] = translate(meta.get("description"))
             enriched.append(meta)
 
@@ -35,7 +36,9 @@ def run(config: Config, webhook_url: str, github_token, embedder, today=None,
     store.save(config.data_dir, projects, embeddings)
     print(f"已写入 {len(enriched)} 个项目,库总量 {len(projects)}。")
 
-    top = sorted(enriched, key=lambda p: p.get("stars", 0), reverse=True)[:config.daily_top_n]
+    # 按「今日新增 star」降序推送(无该数据的回退用总 star)
+    top = sorted(enriched, key=lambda p: (p.get("stars_today") or 0, p.get("stars", 0)),
+                 reverse=True)[:config.daily_top_n]
     notifier(webhook_url, top, f"🔥 GitHub Trending {today}")
     print("Discord 推送完成。")
 

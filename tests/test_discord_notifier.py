@@ -29,6 +29,17 @@ def test_build_payload_falls_back_to_english_without_zh():
     assert "desc" in payload["embeds"][0]["description"]
 
 
+def test_build_payload_shows_stars_today():
+    p = _p("a/x", 100); p["stars_today"] = 42
+    payload = discord_notifier.build_payload([p], "T")
+    assert "今日 +42" in payload["embeds"][0]["description"]
+
+
+def test_build_payload_no_today_when_absent():
+    payload = discord_notifier.build_payload([_p("a/x", 100)], "T")
+    assert "今日" not in payload["embeds"][0]["description"]
+
+
 def test_build_payload_caps_at_10():
     payload = discord_notifier.build_payload([_p(f"o/r{i}", i) for i in range(15)], "T")
     assert len(payload["embeds"]) == 10

@@ -1,7 +1,20 @@
+import re
+
 import requests
 from bs4 import BeautifulSoup
 
 TRENDING_URL = "https://github.com/trending"
+
+# 形如 "1,234 stars today" / "56 stars this week"
+_STARS_PERIOD = re.compile(r"([\d,]+)\s+stars?\s+(today|this week|this month)", re.I)
+
+
+def _stars_in_period(article) -> int | None:
+    el = article.select_one("span.float-sm-right")
+    if not el:
+        return None
+    m = _STARS_PERIOD.search(el.get_text(" ", strip=True))
+    return int(m.group(1).replace(",", "")) if m else None
 
 
 def parse_trending(html: str) -> list[dict]:
@@ -17,6 +30,7 @@ def parse_trending(html: str) -> list[dict]:
         items.append({
             "full_name": full_name,
             "url": f"https://github.com/{full_name}",
+            "stars_today": _stars_in_period(article),
         })
     return items
 

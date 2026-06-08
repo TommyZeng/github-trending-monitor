@@ -209,6 +209,7 @@
         : (list ? `<button class="fav-btn" id="fav-${fid}" onclick="favorite('${list}',${i})">收藏</button>` : '');
       const score = p.score != null ? `<span class="score">相似度 ${p.score.toFixed(3)}</span>` : '';
       const lang = p.language ? `<span class="lang"><span class="swatch"></span>${esc(p.language)}</span><span class="dot"></span>` : '';
+      const today = p.stars_today ? `<span class="dot"></span><span class="score">今日 +${p.stars_today.toLocaleString()}</span>` : '';
       const when = (dateLabel && p.first_seen) ? `<span class="dot"></span><span class="when">${dateLabel} ${esc(p.first_seen)}</span>` : '';
       const topics = (p.topics || []).slice(0, 8).map(t => `<span class="tag">${esc(t)}</span>`).join('');
       const desc = p.summary_zh || p.description_zh || p.description || '';
@@ -218,7 +219,7 @@
             <a class="name" href="${esc(p.url)}" target="_blank" rel="noopener">${name}</a>
             <span class="spacer"></span>${fav}
           </div>
-          <div class="meta">${lang}<span class="num">★ ${(p.stars ?? 0).toLocaleString()}</span>${score ? '<span class="dot"></span>' + score : ''}${when}</div>
+          <div class="meta">${lang}<span class="num">★ ${(p.stars ?? 0).toLocaleString()}</span>${today}${score ? '<span class="dot"></span>' + score : ''}${when}</div>
           ${desc ? `<p class="desc">${esc(desc)}</p>` : ''}
           ${topics ? `<div class="topics">${topics}</div>` : ''}
         </article>`;
