@@ -61,3 +61,34 @@ def test_run_skips_failed_enrichment(tmp_path):
 
     projects, _ = store.load(str(tmp_path))
     assert [p["full_name"] for p in projects] == ["a/x"]
+
+
+def _mini_fetch_enrich():
+    def fake_fetcher(since, language=None, session=None):
+        return [{"full_name": "a/x", "url": "u", "stars_today": 5}]
+    def fake_enricher(full_name, token=None, session=None):
+        return {"full_name": full_name, "url": "u", "description": "A fast tool",
+                "stars": 1, "language": "Go", "topics": [], "readme_excerpt": ""}
+    return fake_fetcher, fake_enricher
+
+
+def test_run_prefers_batch_translator(tmp_path):
+    cfg = Config(data_dir=str(tmp_path))
+    fetcher, enricher = _mini_fetch_enrich()
+    collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-07-02",
+                fetcher=fetcher, enricher=enricher, notifier=lambda *a, **k: None,
+                translate=lambda s: "[google]" + s,
+                translate_batch=lambda texts: ["[llm]" + t for t in texts])
+    projects, _ = store.load(str(tmp_path))
+    assert projects[0]["description_zh"] == "[llm]A fast tool"
+
+
+def test_run_falls_back_to_per_item_when_batch_fails(tmp_path):
+    cfg = Config(data_dir=str(tmp_path))
+    fetcher, enricher = _mini_fetch_enrich()
+    collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-07-02",
+                fetcher=fetcher, enricher=enricher, notifier=lambda *a, **k: None,
+                translate=lambda s: "[google]" + s,
+                translate_batch=lambda texts: None)   # LLM 挂了
+    projects, _ = store.load(str(tmp_path))
+    assert projects[0]["description_zh"] == "[google]A fast tool"

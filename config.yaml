@@ -17,5 +17,7 @@ reranker_api_base: "http://10.0.0.1:8787/v1"
 reranker_model: "bge-reranker-v2-m3"
 realtime_per_keyword: 10
 web_port: 8005          # 本机 web 服务端口
+# 监听地址:127.0.0.1=仅本机;0.0.0.0=局域网可访问(从 10.0.0.1 用 http://10.0.0.2:8005)
+web_host: "0.0.0.0"
 trending_since: "daily"
 data_dir: "data"
