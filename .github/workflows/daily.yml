@@ -33,7 +33,7 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}   # 描述中文翻译(DashScope);未配则回退 Google 翻译
+          TRANSLATE_API_KEY: ${{ secrets.TRANSLATE_API_KEY }}   # 描述中文翻译(MiniMax);未配则回退 Google 翻译
         run: python -m ghtrend.collect
 
       - name: Commit data

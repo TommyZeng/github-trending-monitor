@@ -19,6 +19,9 @@ class Config:
     # 摘要可单独指定 LLM(留空则沿用 llm_api_base / llm_model)
     summary_api_base: str = ""
     summary_model: str = ""
+    # 每日推送的描述翻译可单独指定 LLM(留空则沿用 llm_api_base / llm_model)
+    translate_api_base: str = ""
+    translate_model: str = ""
     reranker_api_base: str = ""
     reranker_model: str = "bge-reranker-v2-m3"
     realtime_per_keyword: int = 10
@@ -64,3 +67,7 @@ def get_reranker_api_key() -> str | None:
 
 def get_summary_api_key() -> str | None:
     return os.environ.get("SUMMARY_API_KEY")
+
+
+def get_translate_api_key() -> str | None:
+    return os.environ.get("TRANSLATE_API_KEY")

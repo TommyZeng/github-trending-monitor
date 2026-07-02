@@ -28,6 +28,8 @@ def _clean(s: str) -> str:
 
 def _parse_array(content: str) -> list[str] | None:
     text = content.strip()
+    # 推理模型(MiniMax-M3、qwen 系等)会先输出 <think>...</think>,先剥掉再找 JSON
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
     text = re.sub(r"^```[a-zA-Z]*\s*|\s*```$", "", text).strip()
     start, end = text.find("["), text.rfind("]")
     if start != -1 and end != -1 and end > start:

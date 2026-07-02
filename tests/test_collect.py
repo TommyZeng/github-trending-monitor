@@ -92,3 +92,32 @@ def test_run_falls_back_to_per_item_when_batch_fails(tmp_path):
                 translate_batch=lambda texts: None)   # LLM 挂了
     projects, _ = store.load(str(tmp_path))
     assert projects[0]["description_zh"] == "[google]A fast tool"
+
+
+def test_build_translate_batch_prefers_translate_config():
+    cfg = Config(translate_api_base="https://t.example/v1", translate_model="mt",
+                 llm_api_base="https://llm.example/v1", llm_model="ml")
+    calls = {}
+    def fake_llm_batch(texts, base, model, api_key=None):
+        calls.update(base=base, model=model, api_key=api_key)
+        return ["译"]
+    fn = collect.build_translate_batch(cfg, "key-t", llm_batch=fake_llm_batch)
+    assert fn(["x"]) == ["译"]
+    assert calls == {"base": "https://t.example/v1", "model": "mt", "api_key": "key-t"}
+
+
+def test_build_translate_batch_falls_back_to_llm_config():
+    cfg = Config(llm_api_base="https://llm.example/v1", llm_model="ml")
+    calls = {}
+    def fake_llm_batch(texts, base, model, api_key=None):
+        calls.update(base=base, model=model)
+        return ["译"]
+    fn = collect.build_translate_batch(cfg, "k", llm_batch=fake_llm_batch)
+    fn(["x"])
+    assert calls == {"base": "https://llm.example/v1", "model": "ml"}
+
+
+def test_build_translate_batch_none_without_base_or_key():
+    assert collect.build_translate_batch(Config(), "k") is None          # 没配 base
+    assert collect.build_translate_batch(
+        Config(translate_api_base="https://t.example/v1"), None) is None  # 没 key

@@ -2,7 +2,7 @@ from datetime import timezone, datetime
 
 from . import store
 from .config import (Config, load_config, get_webhook_url, get_github_token,
-                     get_llm_api_key)
+                     get_llm_api_key, get_translate_api_key)
 from .embedder import Embedder, build_text
 from .trending_fetcher import fetch_trending
 from .github_enricher import enrich
@@ -51,16 +51,23 @@ def run(config: Config, webhook_url: str, github_token, embedder, today=None,
     print("Discord 推送完成。")
 
 
+def build_translate_batch(cfg: Config, api_key, llm_batch=llm_translate_batch):
+    """翻译 LLM 装配:优先 translate_*,留空沿用 llm_*;没配 base 或没 key 返回 None。"""
+    base = cfg.translate_api_base or cfg.llm_api_base
+    model = cfg.translate_model or cfg.llm_model
+    if not (base and api_key):
+        return None
+    return lambda texts: llm_batch(texts, base, model, api_key=api_key)
+
+
 def main() -> None:
     cfg = load_config()
     embedder = Embedder(cfg.embedding_model)
-    # 配了 LLM(公网可达,如 DashScope)就用它批量翻译;失败自动回退 Google 逐条翻译
-    translate_batch = None
-    llm_key = get_llm_api_key()
-    if cfg.llm_api_base and llm_key:
-        translate_batch = lambda texts: llm_translate_batch(
-            texts, cfg.llm_api_base, cfg.llm_model, api_key=llm_key)
-        print(f"描述翻译使用 LLM: {cfg.llm_model} @ {cfg.llm_api_base}")
+    # 配了公网可达的 LLM 就用它批量翻译;失败自动回退 Google 逐条翻译
+    key = get_translate_api_key() if cfg.translate_api_base else get_llm_api_key()
+    translate_batch = build_translate_batch(cfg, key)
+    if translate_batch:
+        print(f"描述翻译使用 LLM: {cfg.translate_model or cfg.llm_model}")
     run(cfg, get_webhook_url(), get_github_token(), embedder,
         translate_batch=translate_batch)
 

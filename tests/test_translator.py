@@ -101,3 +101,12 @@ def test_llm_batch_truncates_overlong_text():
     translator.llm_translate_batch(["x" * 50000], api_base="b", model="m", session=sess)
     prompt = sess.calls[0]["json"]["messages"][0]["content"]
     assert len(prompt) < 2000
+
+
+def test_llm_batch_strips_reasoning_think_block():
+    # 推理模型(MiniMax-M3 等)会先输出 <think>...</think>,里面可能夹带 [ ] 干扰解析
+    sess = _FakeSession(
+        '<think>Let me check requirements [1] and [2]... '
+        'the answer should be ["x"]</think>\n\n["轻量级工具"]')
+    out = translator.llm_translate_batch(["A tool"], api_base="b", model="m", session=sess)
+    assert out == ["轻量级工具"]
