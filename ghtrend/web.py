@@ -46,6 +46,27 @@ def create_app(config: Config, embedder, github_token,
             results.append(p)
         return JSONResponse({"results": results})
 
+    @app.get("/api/local_keyword")
+    def local_keyword(q: str):
+        # 本地库(trending + 收藏)关键词检索:多词 AND,命中任意字段即可,按 star 降序
+        terms = [t.lower() for t in q.split() if t.strip()]
+        if not terms:
+            return JSONResponse({"results": []})
+        fav_p, fav_e = store.load(_fav_dir(config))
+        for p in fav_p:
+            p["favorited"] = True
+        tr_p, tr_e = store.load(config.data_dir)
+        projects, _ = store.merge([(fav_p, fav_e), (tr_p, tr_e)])
+        def hay(p):
+            parts = [p.get("full_name"), p.get("description"), p.get("description_zh"),
+                     p.get("language"), " ".join(p.get("topics") or [])]
+            return " ".join(s for s in parts if s).lower()
+        hits = [p for p in projects if all(t in hay(p) for t in terms)]
+        for p in hits:
+            p.setdefault("favorited", False)
+        hits.sort(key=lambda p: p.get("stars", 0) or 0, reverse=True)
+        return JSONResponse({"results": hits[:50]})
+
     _SINCE = {"daily", "weekly", "monthly"}
 
     @app.get("/api/leaderboard")

@@ -173,6 +173,7 @@
       </div>
       <div class="modes" role="tablist" aria-label="搜索方式">
         <button class="mode active" data-mode="semantic" role="tab">本地语义</button>
+        <button class="mode" data-mode="local_keyword" role="tab">本地关键词</button>
         <button class="mode" data-mode="realtime" role="tab">实时语义</button>
         <button class="mode" data-mode="keyword" role="tab">GitHub 关键词</button>
       </div>
@@ -230,7 +231,7 @@
     const libStatus = document.getElementById('lib-status');
     const lbBox = document.getElementById('lb-results');
     const lbStatus = document.getElementById('lb-status');
-    const modeLabel = { semantic: '本地语义', realtime: '实时语义', keyword: 'GitHub 关键词' };
+    const modeLabel = { semantic: '本地语义', local_keyword: '本地关键词', realtime: '实时语义', keyword: 'GitHub 关键词' };
     const periodLabel = { daily: '今日', weekly: '本周', monthly: '本月' };
     let currentMode = 'semantic', lbSince = 'daily';
     const lists = { search: [], library: [], leaderboard: [] };   // 每个 tab 各自的结果集

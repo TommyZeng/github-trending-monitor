@@ -203,3 +203,68 @@ def test_favorite_dedups(tmp_path):
     client.post("/api/favorite", json=proj)
     r = client.post("/api/favorite", json=proj)
     assert r.json()["count"] == 1   # 重复收藏不增加
+
+
+def _seed_kw(data_dir):
+    projects, embs = store.load(data_dir)
+    items = [
+        {"full_name": "rustify/tui-app", "url": "u", "description": "A terminal UI written in Rust",
+         "description_zh": "用 Rust 写的终端界面", "stars": 300, "language": "Rust",
+         "topics": ["tui", "cli"], "readme_excerpt": ""},
+        {"full_name": "pyweb/flask-admin", "url": "u", "description": "Admin panel for Flask",
+         "description_zh": "Flask 管理后台", "stars": 800, "language": "Python",
+         "topics": ["web"], "readme_excerpt": ""},
+        {"full_name": "gogo/rust-bindgen", "url": "u", "description": "Bindings generator",
+         "description_zh": "绑定生成器", "stars": 500, "language": "Go",
+         "topics": [], "readme_excerpt": ""},
+    ]
+    vecs = np.array([[1.0, 0.0], [0.0, 1.0], [0.5, 0.5]], dtype=np.float32)
+    projects, embs = store.upsert(projects, embs, items, vecs, "2026-07-08")
+    store.save(data_dir, projects, embs)
+
+
+def test_local_keyword_matches_multiple_fields_sorted_by_stars(tmp_path):
+    _seed_kw(str(tmp_path))
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    # "rust" 命中 full_name(rustify、rust-bindgen)、description、language,按 star 降序
+    r = client.get("/api/local_keyword", params={"q": "rust"})
+    names = [p["full_name"] for p in r.json()["results"]]
+    assert names == ["gogo/rust-bindgen", "rustify/tui-app"]
+
+
+def test_local_keyword_multi_term_and_semantics(tmp_path):
+    _seed_kw(str(tmp_path))
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    # 多词 AND:两个词都要命中(任意字段)
+    r = client.get("/api/local_keyword", params={"q": "rust terminal"})
+    assert [p["full_name"] for p in r.json()["results"]] == ["rustify/tui-app"]
+
+
+def test_local_keyword_matches_chinese_description(tmp_path):
+    _seed_kw(str(tmp_path))
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    r = client.get("/api/local_keyword", params={"q": "管理后台"})
+    assert [p["full_name"] for p in r.json()["results"]] == ["pyweb/flask-admin"]
+
+
+def test_local_keyword_includes_favorites_and_marks(tmp_path):
+    _seed_kw(str(tmp_path))
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    client.post("/api/favorite", json={
+        "full_name": "fav/rusty-fav", "url": "u", "description": "rust favorite",
+        "stars": 9999, "topics": []})
+    r = client.get("/api/local_keyword", params={"q": "rust"})
+    results = r.json()["results"]
+    assert results[0]["full_name"] == "fav/rusty-fav"   # star 最高排最前
+    assert results[0]["favorited"] is True
+    assert results[1]["favorited"] is False
+
+
+def test_local_keyword_blank_query_empty(tmp_path):
+    app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
+    client = TestClient(app)
+    assert client.get("/api/local_keyword", params={"q": "  "}).json()["results"] == []

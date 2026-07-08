@@ -4,7 +4,9 @@ semantic_top_k: 10
 embedding_model: "BAAI/bge-m3"          # Actions 云端采集时用的本地模型
 # 本机语义搜索改用在线 OpenAI 兼容 embedding 服务(留空 "" 则回退本地模型)
 # key 放在 .env 的 EMBEDDING_API_KEY(已被 .gitignore 忽略)
-embedding_api_base: "http://127.0.0.1:7000/v1"   # 本机 Docker 容器 bge-m3
+# 留空 = 进程内加载本地 bge-m3(不依赖 GPU/容器,最稳);
+# 想用在线服务再填,如 http://127.0.0.1:7000/v1(本机 Docker vLLM,需 GPU 显存充足)
+embedding_api_base: ""
 embedding_api_model: "bge-m3"
 # 实时 GitHub 语义搜索:LLM 提关键词 + reranker 重排(两者都配齐才启用该模式)
 # key 放 .env:LLM_API_KEY、RERANKER_API_KEY
