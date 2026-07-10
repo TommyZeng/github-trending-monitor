@@ -10,6 +10,8 @@ _PROMPT = (
 
 def _parse_keywords(content: str) -> list[str] | None:
     text = content.strip()
+    # 推理模型(MiniMax-M3 等)会先输出 <think>...</think>,先剥掉再找 JSON
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
     # 去掉可能的 ```json ... ``` 代码块包裹
     text = re.sub(r"^```[a-zA-Z]*\s*|\s*```$", "", text).strip()
     # 容错:截取第一个 [ 到最后一个 ]

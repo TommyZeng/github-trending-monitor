@@ -40,3 +40,21 @@ def test_extract_falls_back_on_error():
     class _Boom:
         def post(self, *a, **k): raise RuntimeError("down")
     assert ke.extract_keywords("my query", "http://llm/v1", "m", session=_Boom()) == ["my query"]
+
+
+class _ThinkSession:
+    """伪造推理模型响应:<think> 里夹带中括号,答案在后面。"""
+    def post(self, url, json=None, headers=None, timeout=None):
+        class _Resp:
+            def raise_for_status(self): pass
+            def json(self):
+                return {"choices": [{"message": {"content":
+                    '<think>requirements [1] and [2]... maybe ["x"]</think>\n'
+                    '["rust terminal", "rust cli tool"]'}}]}
+        return _Resp()
+
+
+def test_extract_strips_reasoning_think_block():
+    kws = ke.extract_keywords(
+        "rust 终端工具", "https://b/v1", "m", session=_ThinkSession())
+    assert kws == ["rust terminal", "rust cli tool"]

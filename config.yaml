@@ -10,8 +10,8 @@ embedding_api_base: "http://10.0.0.1:7000/v1"
 embedding_api_model: "bge-m3"
 # 实时 GitHub 语义搜索:LLM 提关键词 + reranker 重排(两者都配齐才启用该模式)
 # key 放 .env:LLM_API_KEY、RERANKER_API_KEY
-llm_api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"   # 关键词提取(质量敏感,用 deepseek)
-llm_model: "deepseek-v4-flash"
+llm_api_base: "https://api.minimaxi.com/v1"   # 关键词提取(原 DashScope key 失效,切 MiniMax)
+llm_model: "MiniMax-M3"
 # 摘要单独用本机 vLLM 小模型(0.8B 摘要够用、省外部调用);留空则沿用上面的 llm_*
 summary_api_base: "http://10.0.0.1:8001/v1"
 summary_model: "qwen3.5-0.8b"
