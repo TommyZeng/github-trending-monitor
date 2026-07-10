@@ -28,8 +28,12 @@ def search(query: str, config: Config, github_token=None,
         return []
 
     docs = [build_text(c)[:MAX_DOC_CHARS] for c in candidates]
-    ranked = rerank_fn(query, docs, config.reranker_api_base, config.reranker_model,
-                       api_key=reranker_api_key)
+    try:
+        ranked = rerank_fn(query, docs, config.reranker_api_base, config.reranker_model,
+                           api_key=reranker_api_key)
+    except Exception:
+        # reranker 不可用时降级:按候选原始顺序返回,不带相似度分
+        return candidates[:config.semantic_top_k]
 
     results = []
     for idx, score in ranked[:config.semantic_top_k]:

@@ -18,7 +18,7 @@ summary_model: "qwen3.5-0.8b"
 # 每日推送的描述翻译(公网可达,Actions 也能调);key 放 .env / Actions Secrets: TRANSLATE_API_KEY
 translate_api_base: "https://api.minimaxi.com/v1"
 translate_model: "MiniMax-M3"
-reranker_api_base: "http://127.0.0.1:8787/v1"   # 本机 Docker 容器 bge-reranker
+reranker_api_base: "http://10.0.0.1:8787/v1"   # 在线 reranker(与 bge-m3 同机)
 reranker_model: "bge-reranker-v2-m3"
 realtime_per_keyword: 10
 web_port: 8005          # 本机 web 服务端口

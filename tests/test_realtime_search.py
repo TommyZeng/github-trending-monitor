@@ -64,3 +64,17 @@ def test_search_returns_empty_when_no_candidates():
         "q", _cfg(), extract=lambda *a, **k: ["kw"],
         searcher=lambda *a, **k: [], rerank_fn=lambda *a, **k: [])
     assert results == []
+
+
+def test_search_falls_back_unranked_when_reranker_down():
+    # reranker 服务挂掉时不应 500,回退按候选顺序返回 top_k(无 score)
+    def boom(*a, **k):
+        raise RuntimeError("connection refused")
+
+    repos = [_repo(f"o/r{i}") for i in range(5)]
+    results = realtime_search.search(
+        "q", _cfg(), extract=lambda *a, **k: ["kw"],
+        searcher=lambda *a, **k: repos, rerank_fn=boom)
+
+    assert [r["full_name"] for r in results] == ["o/r0", "o/r1"]   # semantic_top_k=2
+    assert all("score" not in r for r in results)
