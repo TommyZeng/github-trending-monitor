@@ -43,16 +43,9 @@ def _parse_array(content: str) -> list[str] | None:
     return [str(x).strip() for x in data]
 
 
-def add_summaries(items: list[dict], api_base: str, model: str,
-                  api_key=None, session=None) -> list[dict]:
-    """给每个项目加 summary_zh(LLM 批量生成的一句话中文摘要)。
-    一次 LLM 调用;任何失败都原样返回(不加 summary_zh),不影响搜索结果。"""
-    if not items:
-        return items
-    sess = session
-    if sess is None:
-        import requests
-        sess = requests
+def _summarize_batch(items: list[dict], api_base: str, model: str,
+                     api_key, sess) -> list[str] | None:
+    """单次批量调用;网络/审核/解析/条数不齐等任何失败返回 None。"""
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -66,11 +59,34 @@ def add_summaries(items: list[dict], api_base: str, model: str,
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"]
     except Exception:
-        return items
+        return None
     summaries = _parse_array(content)
-    if summaries:
-        for item, s in zip(items, summaries):
-            s = _clean(s)
-            if s:
-                item["summary_zh"] = s
+    if summaries is None or len(summaries) != len(items):
+        return None
+    return summaries
+
+
+def add_summaries(items: list[dict], api_base: str, model: str,
+                  api_key=None, session=None) -> list[dict]:
+    """给每个项目加 summary_zh(LLM 批量生成的一句话中文摘要)。
+    正常一次调用;整批失败时二分拆批重试(个别描述会触发服务商内容审核
+    连累整批,如 MiniMax 422 input new_sensitive),只有出问题的条目
+    拿不到摘要,绝不抛异常、不影响搜索结果。"""
+    if not items:
+        return items
+    sess = session
+    if sess is None:
+        import requests
+        sess = requests
+    summaries = _summarize_batch(items, api_base, model, api_key, sess)
+    if summaries is None:
+        if len(items) > 1:
+            mid = len(items) // 2
+            add_summaries(items[:mid], api_base, model, api_key=api_key, session=sess)
+            add_summaries(items[mid:], api_base, model, api_key=api_key, session=sess)
+        return items
+    for item, s in zip(items, summaries):
+        s = _clean(s)
+        if s:
+            item["summary_zh"] = s
     return items

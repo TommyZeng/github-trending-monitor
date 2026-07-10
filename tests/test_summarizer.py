@@ -64,3 +64,36 @@ def test_build_block_truncates_long_description():
     # 单条描述不应把整段 5 万字符塞进 prompt
     assert len(block) < summarizer.MAX_DESC_CHARS + 200
     assert "y" * (summarizer.MAX_DESC_CHARS + 1) not in block
+
+
+class _ModerationSession:
+    """伪造内容审核:prompt 里含 badrepo 的批次返回 422,其余正常。"""
+    def __init__(self):
+        self.calls = 0
+
+    def post(self, url, json=None, headers=None, timeout=None):
+        self.calls += 1
+        content_in = json["messages"][0]["content"]
+        bad = "badrepo" in content_in
+        n = content_in.count("\n") - content_in.split("\n\n")[0].count("\n")  # 粗略条数
+        import re as _re
+        rows = _re.findall(r"^\d+\. ", content_in, flags=_re.M)
+        class _Resp:
+            def raise_for_status(self):
+                if bad:
+                    raise RuntimeError("422 input new_sensitive")
+            def json(self):
+                import json as _json
+                return {"choices": [{"message": {"content":
+                    _json.dumps([f"摘要{i}" for i in range(len(rows))], ensure_ascii=False)}}]}
+        return _Resp()
+
+
+def test_add_summaries_bisects_around_moderated_item():
+    # 4 条里 1 条触发审核:其余 3 条仍应拿到摘要,坏的那条没有
+    items = [{"full_name": f"o/repo{i}", "description": "fine", "topics": []} for i in range(4)]
+    items[2]["description"] = "badrepo content"
+    sess = _ModerationSession()
+    out = summarizer.add_summaries(items, "http://llm/v1", "m", session=sess)
+    assert "summary_zh" in out[0] and "summary_zh" in out[1] and "summary_zh" in out[3]
+    assert "summary_zh" not in out[2]

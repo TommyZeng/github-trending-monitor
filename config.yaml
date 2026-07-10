@@ -12,9 +12,9 @@ embedding_api_model: "bge-m3"
 # key 放 .env:LLM_API_KEY、RERANKER_API_KEY
 llm_api_base: "https://api.minimaxi.com/v1"   # 关键词提取(原 DashScope key 失效,切 MiniMax)
 llm_model: "MiniMax-M3"
-# 摘要单独用本机 vLLM 小模型(0.8B 摘要够用、省外部调用);留空则沿用上面的 llm_*
-summary_api_base: "http://10.0.0.1:8001/v1"
-summary_model: "qwen3.5-0.8b"
+# 搜索结果中文摘要(keyword/realtime/leaderboard);key 放 .env: SUMMARY_API_KEY
+summary_api_base: "https://api.minimaxi.com/v1"
+summary_model: "MiniMax-M3"
 # 每日推送的描述翻译(公网可达,Actions 也能调);key 放 .env / Actions Secrets: TRANSLATE_API_KEY
 translate_api_base: "https://api.minimaxi.com/v1"
 translate_model: "MiniMax-M3"
