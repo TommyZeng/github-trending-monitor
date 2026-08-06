@@ -57,12 +57,24 @@ def _default_translator():
     return GoogleTranslator(source="auto", target="zh-CN")
 
 
+# 翻译服务(Google 等)故障时不一定抛异常,可能把错误页面文本当译文返回
+# (实测曾把 "Error 500 (Server Error)!!1..." 当描述推送出去),需识别后回退原文
+_ERROR_PAGE = re.compile(
+    r"Error \d{3} \(|That['’]s an error|That['’]s all we know"
+    r"|<!DOCTYPE html|<html[\s>]|Service Unavailable",
+    re.I)
+
+
 def translate_to_zh(text, translator=None) -> str:
-    """把文本翻成简体中文。空文本返回 "";翻译出错时回退返回原文,绝不抛异常。"""
+    """把文本翻成简体中文。空文本返回 "";翻译出错(含服务返回错误页面)
+    时回退返回原文,绝不抛异常。"""
     if not text:
         return ""
     try:
         t = translator if translator is not None else _default_translator()
-        return t.translate(text)
+        out = t.translate(text)
     except Exception:
         return text
+    if not out or _ERROR_PAGE.search(out):
+        return text
+    return out

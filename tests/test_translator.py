@@ -110,3 +110,34 @@ def test_llm_batch_strips_reasoning_think_block():
         'the answer should be ["x"]</think>\n\n["轻量级工具"]')
     out = translator.llm_translate_batch(["A tool"], api_base="b", model="m", session=sess)
     assert out == ["轻量级工具"]
+
+
+# ---------- 翻译服务错误页面识别 ----------
+
+class _ErrorPageTranslator:
+    """翻译服务故障时不抛异常,而是把错误页面文本当译文返回。"""
+    def __init__(self, page): self._page = page
+    def translate(self, text): return self._page
+
+
+_ERROR_PAGES = [
+    "Error 500 (Server Error)!!1500.That's an error.There was an error. "
+    "Please try again later.That's all we know.",
+    "Error 502 (Server Error)!!2That's an error.",
+    "<!DOCTYPE html><html><head><title>503 Service Unavailable</title></head></html>",
+]
+
+
+def test_rejects_translator_error_page_and_keeps_original():
+    for page in _ERROR_PAGES:
+        out = translator.translate_to_zh(
+            "Give your agent a computer", translator=_ErrorPageTranslator(page))
+        assert out == "Give your agent a computer", f"未识别错误页: {page[:40]}"
+
+
+def test_keeps_legitimate_translation_mentioning_error():
+    # 正常译文里出现「错误」字样不应被误杀
+    good = "一个用于处理 HTTP 500 错误的中间件"
+    out = translator.translate_to_zh(
+        "Middleware for handling HTTP 500 errors", translator=_ErrorPageTranslator(good))
+    assert out == good
