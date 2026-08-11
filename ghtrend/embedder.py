@@ -5,6 +5,9 @@ def build_text(project: dict) -> str:
     parts = [
         project.get("full_name") or "",
         project.get("description") or "",
+        # 中文译文一并入索引:中文查询可同语言匹配,不必依赖跨语言对齐
+        # (实测 "自托管的密码管理器" 命中 bitwarden 的相似度 0.375 → 0.648)
+        project.get("description_zh") or "",
         " ".join(project.get("topics") or []),
         project.get("readme_excerpt") or "",
     ]

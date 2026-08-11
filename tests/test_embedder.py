@@ -29,3 +29,17 @@ def test_encode_returns_float32_array_via_injected_model():
     assert out.dtype == np.float32
     assert out.shape == (2, 2)
     assert out[0, 0] == 2.0 and out[1, 0] == 3.0
+
+
+def test_build_text_includes_chinese_description():
+    # 中文译文必须进索引:中文查询才能同语言匹配,而非依赖跨语言对齐
+    p = {"full_name": "a/x", "description": "A password manager",
+         "description_zh": "一个密码管理器", "topics": [], "readme_excerpt": ""}
+    text = embedder.build_text(p)
+    assert "一个密码管理器" in text
+    assert "A password manager" in text   # 英文原文仍保留
+
+
+def test_build_text_without_chinese_still_works():
+    p = {"full_name": "a/x", "description": "A tool", "topics": [], "readme_excerpt": ""}
+    assert embedder.build_text(p) == "a/x\nA tool"
