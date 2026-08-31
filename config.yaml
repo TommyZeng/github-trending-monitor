@@ -2,27 +2,24 @@ daily_top_n: 10
 languages: null        # null=全部;或 [Python, Rust, TypeScript]
 semantic_top_k: 10
 embedding_model: "BAAI/bge-m3"          # Actions 云端采集时用的本地模型
-# 本机语义搜索改用在线 OpenAI 兼容 embedding 服务(留空 "" 则回退本地模型)
-# key 放在 .env 的 EMBEDDING_API_KEY(已被 .gitignore 忽略)
-# 留空 "" = 进程内加载本机 bge-m3(模型缓存已备好,不依赖外部服务,永不掉线);
-# 想用在线服务再填,如 http://10.0.0.1:7000/v1(该机服务时常不可用)
-embedding_api_base: ""
+# 本机 bge-m3 服务;留空 "" 则回退进程内本地模型(模型缓存已备好,服务不可用时可切)
+embedding_api_base: "http://localhost:7000/v1"
 embedding_api_model: "bge-m3"
 # 实时 GitHub 语义搜索:LLM 提关键词 + reranker 重排(两者都配齐才启用该模式)
 # key 放 .env:LLM_API_KEY、RERANKER_API_KEY
-llm_api_base: "https://api.minimaxi.com/v1"   # 关键词提取(原 DashScope key 失效,切 MiniMax)
-llm_model: "MiniMax-M3"
+llm_api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"   # 关键词提取
+llm_model: "qwen3.8-flash"
 # 搜索结果中文摘要(keyword/realtime/leaderboard);key 放 .env: SUMMARY_API_KEY
-summary_api_base: "https://api.minimaxi.com/v1"
-summary_model: "MiniMax-M3"
+summary_api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+summary_model: "qwen3.8-flash"
 # 每日推送的描述翻译(公网可达,Actions 也能调);key 放 .env / Actions Secrets: TRANSLATE_API_KEY
-translate_api_base: "https://api.minimaxi.com/v1"
-translate_model: "MiniMax-M3"
-reranker_api_base: "http://10.0.0.1:8787/v1"   # 在线 reranker(与 bge-m3 同机)
+translate_api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+translate_model: "qwen3.8-flash"
+reranker_api_base: "http://localhost:8787/v1"   # 本机 reranker
 reranker_model: "bge-reranker-v2-m3"
 realtime_per_keyword: 10
 web_port: 8005          # 本机 web 服务端口
-# 监听地址:127.0.0.1=仅本机;0.0.0.0=局域网可访问(从 10.0.0.1 用 http://10.0.0.2:8005)
+# 监听地址:127.0.0.1=仅本机;0.0.0.0=局域网可访问(内网用 http://10.0.0.2:8005)
 web_host: "0.0.0.0"
 trending_since: "daily"
 data_dir: "data"
