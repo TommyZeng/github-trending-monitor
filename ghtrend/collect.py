@@ -32,9 +32,16 @@ def run(config: Config, webhook_url: str, github_token, embedder, today=None,
     descs = [p.get("description") for p in enriched]
     zh = translate_batch(descs) if translate_batch else None
     if zh is None:
+        if translate_batch:
+            print("⚠ LLM 翻译失败,回退逐条 Google 翻译(请检查 TRANSLATE_API_KEY 是否有效)")
         zh = [translate(d) for d in descs]
     for p, z in zip(enriched, zh):
         p["description_zh"] = z
+    # 两层翻译都失败时译文=原文,推送会显示英文;必须留痕,否则降级会静默持续
+    untranslated = sum(1 for p in enriched
+                       if p.get("description") and p["description_zh"] == p["description"])
+    if untranslated:
+        print(f"⚠ {untranslated}/{len(enriched)} 个描述未能翻译成中文(将以英文推送)")
 
     texts = [build_text(p) for p in enriched]
     vecs = embedder.encode(texts)

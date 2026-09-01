@@ -121,3 +121,26 @@ def test_build_translate_batch_none_without_base_or_key():
     assert collect.build_translate_batch(Config(), "k") is None          # 没配 base
     assert collect.build_translate_batch(
         Config(translate_api_base="https://t.example/v1"), None) is None  # 没 key
+
+
+def test_run_warns_when_llm_translation_fails(tmp_path, capsys):
+    # LLM 翻译失败必须在日志留痕,否则降级会静默持续数周无人察觉
+    cfg = Config(data_dir=str(tmp_path))
+    fetcher, enricher = _mini_fetch_enrich()
+    collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-09-01",
+                fetcher=fetcher, enricher=enricher, notifier=lambda *a, **k: None,
+                translate=lambda s: "[google]" + s,
+                translate_batch=lambda texts: None)
+    out = capsys.readouterr().out
+    assert "LLM 翻译失败" in out
+
+
+def test_run_warns_when_descriptions_left_untranslated(tmp_path, capsys):
+    # 两层翻译都失败(译文=原文)时,要统计并告警
+    cfg = Config(data_dir=str(tmp_path))
+    fetcher, enricher = _mini_fetch_enrich()
+    collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-09-01",
+                fetcher=fetcher, enricher=enricher, notifier=lambda *a, **k: None,
+                translate=lambda s: s)        # Google 也失败,原样返回
+    out = capsys.readouterr().out
+    assert "未能翻译" in out
