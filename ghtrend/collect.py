@@ -2,8 +2,8 @@ from datetime import timezone, datetime
 
 from . import store
 from .config import (Config, load_config, get_webhook_url, get_github_token,
-                     get_llm_api_key, get_translate_api_key)
-from .embedder import Embedder, build_text
+                     get_llm_api_key, get_translate_api_key, get_embedding_api_key)
+from .embedder import Embedder, RemoteEmbedder, build_text
 from .trending_fetcher import fetch_trending
 from .github_enricher import enrich
 from .discord_notifier import send
@@ -67,9 +67,23 @@ def build_translate_batch(cfg: Config, api_key, llm_batch=llm_translate_batch):
     return lambda texts: llm_batch(texts, base, model, api_key=api_key)
 
 
+def build_embedder(cfg: Config, api_key):
+    """采集端 embedder:配了在线服务就用它(须与 web 查询同源,否则向量不可比),
+    否则用进程内本地模型。配了服务却没 key 直接报错——静默用本地模型会往库里
+    写入不同语义空间的向量,污染无法察觉。"""
+    if not cfg.embedding_api_base:
+        return Embedder(cfg.embedding_model)
+    if not api_key:
+        raise RuntimeError(
+            f"已配置 embedding 服务 {cfg.embedding_api_base},但环境变量 "
+            "EMBEDDING_API_KEY 未设置(Actions 需在仓库 Secrets 中添加)")
+    return RemoteEmbedder(cfg.embedding_api_base, cfg.embedding_api_model,
+                          api_key=api_key)
+
+
 def main() -> None:
     cfg = load_config()
-    embedder = Embedder(cfg.embedding_model)
+    embedder = build_embedder(cfg, get_embedding_api_key())
     # 配了公网可达的 LLM 就用它批量翻译;失败自动回退 Google 逐条翻译
     key = get_translate_api_key() if cfg.translate_api_base else get_llm_api_key()
     translate_batch = build_translate_batch(cfg, key)

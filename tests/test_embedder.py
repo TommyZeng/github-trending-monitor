@@ -43,3 +43,28 @@ def test_build_text_includes_chinese_description():
 def test_build_text_without_chinese_still_works():
     p = {"full_name": "a/x", "description": "A tool", "topics": [], "readme_excerpt": ""}
     assert embedder.build_text(p) == "a/x\nA tool"
+
+
+class _BatchSession:
+    """记录每次请求的条数(阿里云 embedding 限制单批 ≤20)。"""
+    def __init__(self): self.sizes = []
+
+    def post(self, url, json=None, headers=None, timeout=None):
+        n = len(json["input"])
+        self.sizes.append(n)
+        class _Resp:
+            def raise_for_status(self):
+                if n > 20:
+                    raise RuntimeError("batch size is invalid, it should not be larger than 20")
+            def json(self):
+                return {"data": [{"index": i, "embedding": [1.0, 0.0]} for i in range(n)]}
+        return _Resp()
+
+
+def test_remote_embedder_splits_into_batches():
+    sess = _BatchSession()
+    em = embedder.RemoteEmbedder("http://svc/v1", "m", api_key="k", session=sess)
+    vecs = em.encode([f"t{i}" for i in range(45)])
+    assert vecs.shape[0] == 45              # 全部返回,顺序完整
+    assert max(sess.sizes) <= 20            # 每批不超限
+    assert sum(sess.sizes) == 45            # 不重不漏

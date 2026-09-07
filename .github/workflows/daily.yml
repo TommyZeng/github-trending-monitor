@@ -34,6 +34,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TRANSLATE_API_KEY: ${{ secrets.TRANSLATE_API_KEY }}   # 描述中文翻译(DashScope qwen);未配则回退 Google 翻译
+          EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}   # 向量编码(须与本机查询同源,未配则采集报错)
         run: python -m ghtrend.collect
 
       - name: Commit data

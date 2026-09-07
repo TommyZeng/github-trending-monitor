@@ -2,9 +2,10 @@ daily_top_n: 10
 languages: null        # null=全部;或 [Python, Rust, TypeScript]
 semantic_top_k: 10
 embedding_model: "BAAI/bge-m3"          # Actions 云端采集时用的本地模型
-# 本机 bge-m3 服务;留空 "" 则回退进程内本地模型(模型缓存已备好,服务不可用时可切)
-embedding_api_base: "http://localhost:7000/v1"
-embedding_api_model: "bge-m3"
+# 阿里云百炼在线 embedding;云端采集与本机查询共用同一服务(向量须同源)
+# key 放 .env / Actions Secrets: EMBEDDING_API_KEY
+embedding_api_base: "https://llm-ood1no5eynt8jj1f.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+embedding_api_model: "qwen3.7-text-embedding"
 # 实时 GitHub 语义搜索:LLM 提关键词 + reranker 重排(两者都配齐才启用该模式)
 # key 放 .env:LLM_API_KEY、RERANKER_API_KEY
 llm_api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"   # 关键词提取
@@ -15,8 +16,8 @@ summary_model: "qwen3.8-flash"
 # 每日推送的描述翻译(公网可达,Actions 也能调);key 放 .env / Actions Secrets: TRANSLATE_API_KEY
 translate_api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
 translate_model: "qwen3.8-flash"
-reranker_api_base: "http://localhost:8787/v1"   # 本机 reranker
-reranker_model: "bge-reranker-v2-m3"
+reranker_api_base: "https://llm-ood1no5eynt8jj1f.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"   # 阿里云百炼(rerank 走 DashScope 原生路径)
+reranker_model: "qwen3-rerank"
 realtime_per_keyword: 10
 web_port: 8005          # 本机 web 服务端口
 # 监听地址:127.0.0.1=仅本机;0.0.0.0=局域网可访问(内网用 http://10.0.0.2:8005)

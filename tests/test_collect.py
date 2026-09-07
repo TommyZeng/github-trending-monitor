@@ -144,3 +144,29 @@ def test_run_warns_when_descriptions_left_untranslated(tmp_path, capsys):
                 translate=lambda s: s)        # Google 也失败,原样返回
     out = capsys.readouterr().out
     assert "未能翻译" in out
+
+
+def test_build_embedder_uses_remote_when_configured():
+    # 云端采集必须与 web 查询用同一 embedding 服务,否则向量不同源、搜索失效
+    cfg = Config(embedding_api_base="https://svc/v1", embedding_api_model="qwen3.7-text-embedding")
+    em = collect.build_embedder(cfg, "key-e")
+    assert em.api_base == "https://svc/v1"
+    assert em.model == "qwen3.7-text-embedding"
+    assert em.api_key == "key-e"
+
+
+def test_build_embedder_falls_back_to_local_model():
+    cfg = Config(embedding_model="BAAI/bge-m3")     # 未配在线服务
+    em = collect.build_embedder(cfg, None)
+    assert em.model_name == "BAAI/bge-m3"
+
+
+def test_build_embedder_requires_key_when_remote():
+    # 配了在线服务却没 key:必须报错而非静默用本地模型(会产生不同源向量污染库)
+    cfg = Config(embedding_api_base="https://svc/v1")
+    try:
+        collect.build_embedder(cfg, None)
+    except RuntimeError as e:
+        assert "EMBEDDING_API_KEY" in str(e)
+    else:
+        raise AssertionError("应抛出 RuntimeError")

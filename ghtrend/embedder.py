@@ -30,6 +30,10 @@ class Embedder:
         return np.asarray(vecs, dtype=np.float32)
 
 
+# 在线 embedding 单批条数上限(阿里云百炼为 20,超出报 400)
+MAX_EMBED_BATCH = 20
+
+
 class RemoteEmbedder:
     """调用 OpenAI 兼容的在线 embedding 服务(如自建 vLLM bge-m3)。
     返回 L2 归一化的 float32 向量,与本地 Embedder 输出一致,可与已存向量直接比对。"""
@@ -50,13 +54,19 @@ class RemoteEmbedder:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        resp = self._get_session().post(
-            f"{self.api_base}/embeddings",
-            json={"model": self.model, "input": list(texts)},
-            headers=headers, timeout=60)
-        resp.raise_for_status()
-        items = sorted(resp.json()["data"], key=lambda d: d.get("index", 0))
-        vecs = np.asarray([it["embedding"] for it in items], dtype=np.float32)
+        texts = list(texts)
+        rows = []
+        # 分批:阿里云百炼 embedding 单批上限 20 条,超出直接 400
+        for i in range(0, len(texts), MAX_EMBED_BATCH):
+            batch = texts[i:i + MAX_EMBED_BATCH]
+            resp = self._get_session().post(
+                f"{self.api_base}/embeddings",
+                json={"model": self.model, "input": batch},
+                headers=headers, timeout=60)
+            resp.raise_for_status()
+            items = sorted(resp.json()["data"], key=lambda d: d.get("index", 0))
+            rows.extend(it["embedding"] for it in items)
+        vecs = np.asarray(rows, dtype=np.float32)
         norms = np.linalg.norm(vecs, axis=1, keepdims=True)
         norms[norms == 0] = 1.0
         return (vecs / norms).astype(np.float32)
