@@ -1,15 +1,16 @@
 from urllib.parse import urlsplit
 
-_DASHSCOPE_RERANK_PATH = "/api/v1/services/rerank/text-rerank/text-rerank"
+# 百炼的 rerank 不在 chat 那套 compatible-mode 下,而在 compatible-api(复数 reranks)
+_ALIYUN_RERANK_PATH = "/compatible-api/v1/reranks"
 
 
-def _is_dashscope(api_base: str) -> bool:
+def _is_aliyun(api_base: str) -> bool:
     return "aliyuncs.com" in urlsplit(api_base).netloc
 
 
-def _dashscope_url(api_base: str) -> str:
+def _aliyun_url(api_base: str) -> str:
     parts = urlsplit(api_base)
-    return f"{parts.scheme}://{parts.netloc}{_DASHSCOPE_RERANK_PATH}"
+    return f"{parts.scheme}://{parts.netloc}{_ALIYUN_RERANK_PATH}"
 
 
 def rerank(query: str, documents: list[str], api_base: str, model: str,
@@ -25,20 +26,13 @@ def rerank(query: str, documents: list[str], api_base: str, model: str,
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    if _is_dashscope(api_base):
-        # 阿里云百炼/DashScope 的 rerank 不在 OpenAI 兼容路径下,
-        # 请求体(query/documents 嵌在 input)与响应(results 嵌在 output)也自成一套
-        url = _dashscope_url(api_base)
-        payload = {"model": model,
-                   "input": {"query": query, "documents": list(documents)},
-                   "parameters": {"return_documents": False}}
-    else:
-        url = f"{api_base.rstrip('/')}/rerank"
-        payload = {"model": model, "query": query, "documents": list(documents)}
-    resp = sess.post(url, json=payload, headers=headers, timeout=60)
+    # 请求/响应格式两边一致,只有 URL 不同
+    url = _aliyun_url(api_base) if _is_aliyun(api_base) else f"{api_base.rstrip('/')}/rerank"
+    resp = sess.post(
+        url, json={"model": model, "query": query, "documents": list(documents)},
+        headers=headers, timeout=60)
     resp.raise_for_status()
-    body = resp.json()
-    results = body.get("output", {}).get("results") or body.get("results") or []
+    results = resp.json().get("results", [])
     ranked = [(r["index"], float(r["relevance_score"])) for r in results]
     ranked.sort(key=lambda t: t[1], reverse=True)
     return ranked

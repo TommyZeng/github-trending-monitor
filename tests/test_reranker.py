@@ -37,35 +37,21 @@ def test_rerank_empty_documents_returns_empty():
     assert out == []
 
 
-class _DashScopeSession:
-    """阿里云 DashScope 原生 rerank:路径与响应格式都与 Jina 风格不同。"""
-    def __init__(self): self.calls = []
-
-    def post(self, url, json=None, headers=None, timeout=None):
-        self.calls.append({"url": url, "json": json})
-        class _Resp:
-            def raise_for_status(self): pass
-            def json(self):
-                return {"output": {"results": [
-                    {"index": 1, "relevance_score": 0.70},
-                    {"index": 0, "relevance_score": 0.36}]}}
-        return _Resp()
-
-
-def test_rerank_uses_dashscope_native_api_for_aliyun():
-    sess = _DashScopeSession()
+def test_rerank_uses_aliyun_reranks_endpoint():
+    # 阿里云百炼的 rerank 在 /compatible-api/v1/reranks(与 chat 的
+    # compatible-mode 不同路径),但请求/响应仍是标准 Jina 格式
+    sess = _Session({"results": [{"index": 1, "relevance_score": 0.78},
+                                 {"index": 0, "relevance_score": 0.28}]})
     out = reranker.rerank(
         "密码管理器", ["文件管理器", "密码管理工具"],
         "https://llm-x.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
         "qwen3-rerank", api_key="k", session=sess)
-    assert out == [(1, 0.70), (0, 0.36)]
+    assert out == [(1, 0.78), (0, 0.28)]
     call = sess.calls[0]
-    # 走原生路径(而非 compatible-mode 下的 /rerank)
     assert call["url"] == ("https://llm-x.cn-beijing.maas.aliyuncs.com"
-                           "/api/v1/services/rerank/text-rerank/text-rerank")
-    # 原生请求体:query/documents 嵌在 input 下
-    assert call["json"]["input"]["query"] == "密码管理器"
-    assert call["json"]["input"]["documents"] == ["文件管理器", "密码管理工具"]
+                           "/compatible-api/v1/reranks")
+    assert call["json"]["query"] == "密码管理器"
+    assert call["json"]["documents"] == ["文件管理器", "密码管理工具"]
 
 
 def test_rerank_keeps_jina_style_for_self_hosted():
