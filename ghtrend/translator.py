@@ -4,6 +4,9 @@ import re
 # 防个别仓库的超长描述撑爆 LLM 上下文导致整批翻译失败)
 MAX_TEXT_CHARS = 400
 
+# 翻译失败重试次数(Google 兜底在 Actions 环境已不可用,只能靠 LLM 自身重试)
+MAX_ATTEMPTS = 3
+
 _LLM_PROMPT = (
     "把下面这些 GitHub 项目的英文描述翻译成简体中文:通顺自然,"
     "保留技术专有名词英文原样(如 CLI、RAG、LLM、API 及框架/产品名),去掉无关符号。"
@@ -11,12 +14,42 @@ _LLM_PROMPT = (
 )
 
 
-def llm_translate_batch(texts, api_base: str, model: str,
-                        api_key=None, session=None) -> list[str] | None:
-    """用 LLM 一次调用批量翻译成中文。成功返回与输入等长的译文列表(空文本占位 "");
-    任何失败(网络/解析/条数不齐)返回 None,由调用方回退其他翻译方式。"""
+def _translate_once(texts, idx, api_base, model, api_key, sess) -> list[str] | None:
+    """翻译 idx 指定的那些文本;失败(网络/解析/条数不齐)返回 None。"""
     from .summarizer import _parse_array, _clean
 
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    block = "\n".join(f"{n}. {str(texts[i])[:MAX_TEXT_CHARS]}"
+                      for n, i in enumerate(idx, 1))
+    parsed = None
+    for _ in range(MAX_ATTEMPTS):     # 偶发网络/限流重试
+        try:
+            resp = sess.post(
+                f"{api_base.rstrip('/')}/chat/completions",
+                json={"model": model, "temperature": 0,
+                      "messages": [{"role": "user",
+                                    "content": _LLM_PROMPT.format(block=block)}]},
+                headers=headers, timeout=60)
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"]
+        except Exception:
+            continue
+        parsed = _parse_array(content)
+        if parsed is not None and len(parsed) == len(idx):
+            break
+        parsed = None
+    if parsed is None:
+        return None
+    return [_clean(v) or str(texts[i]) for i, v in zip(idx, parsed)]
+
+
+def llm_translate_batch(texts, api_base: str, model: str,
+                        api_key=None, session=None) -> list[str] | None:
+    """用 LLM 批量翻译成中文,返回与输入等长的译文列表(空文本占位 "")。
+    整批失败时二分拆批重试——个别描述会被服务端拒绝并连累整批,拆开后
+    只有出问题的那条保留原文。全部失败返回 None。"""
     texts = list(texts or [])
     if not texts:
         return []
@@ -27,54 +60,25 @@ def llm_translate_batch(texts, api_base: str, model: str,
     if sess is None:
         import requests
         sess = requests
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    block = "\n".join(f"{n}. {str(texts[i])[:MAX_TEXT_CHARS]}"
-                      for n, i in enumerate(idx, 1))
-    try:
-        resp = sess.post(
-            f"{api_base.rstrip('/')}/chat/completions",
-            json={"model": model, "temperature": 0,
-                  "messages": [{"role": "user",
-                                "content": _LLM_PROMPT.format(block=block)}]},
-            headers=headers, timeout=60)
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
-    except Exception:
-        return None
-    parsed = _parse_array(content)
-    if parsed is None or len(parsed) != len(idx):
-        return None
+
     out = ["" for _ in texts]
-    for i, s in zip(idx, parsed):
-        out[i] = _clean(s) or str(texts[i])
-    return out
+    ok = False
 
+    def fill(sub_idx):
+        nonlocal ok
+        if not sub_idx:
+            return
+        got = _translate_once(texts, sub_idx, api_base, model, api_key, sess)
+        if got is not None:
+            for i, v in zip(sub_idx, got):
+                out[i] = v
+            ok = True
+        elif len(sub_idx) > 1:
+            mid = len(sub_idx) // 2
+            fill(sub_idx[:mid])
+            fill(sub_idx[mid:])
+        else:
+            out[sub_idx[0]] = str(texts[sub_idx[0]])   # 单条仍失败:保留原文
 
-def _default_translator():
-    from deep_translator import GoogleTranslator
-    return GoogleTranslator(source="auto", target="zh-CN")
-
-
-# 翻译服务(Google 等)故障时不一定抛异常,可能把错误页面文本当译文返回
-# (实测曾把 "Error 500 (Server Error)!!1..." 当描述推送出去),需识别后回退原文
-_ERROR_PAGE = re.compile(
-    r"Error \d{3} \(|That['’]s an error|That['’]s all we know"
-    r"|<!DOCTYPE html|<html[\s>]|Service Unavailable",
-    re.I)
-
-
-def translate_to_zh(text, translator=None) -> str:
-    """把文本翻成简体中文。空文本返回 "";翻译出错(含服务返回错误页面)
-    时回退返回原文,绝不抛异常。"""
-    if not text:
-        return ""
-    try:
-        t = translator if translator is not None else _default_translator()
-        out = t.translate(text)
-    except Exception:
-        return text
-    if not out or _ERROR_PAGE.search(out):
-        return text
-    return out
+    fill(idx)
+    return out if ok else None

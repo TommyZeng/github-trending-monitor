@@ -31,7 +31,7 @@ def test_run_collects_dedups_and_notifies(tmp_path):
 
     collect.run(cfg, "https://hook", "tok", _DummyEmbedder(), today="2026-06-02",
                 fetcher=fake_fetcher, enricher=fake_enricher, notifier=fake_notifier,
-                translate=lambda s: f"[zh]{s}")
+                translate_batch=lambda texts: [f"[zh]{t}" for t in texts])
 
     projects, embs = store.load(str(tmp_path))
     assert len(projects) == 2
@@ -57,7 +57,7 @@ def test_run_skips_failed_enrichment(tmp_path):
 
     collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-06-02",
                 fetcher=fake_fetcher, enricher=fake_enricher,
-                notifier=lambda *a, **k: None, translate=lambda s: s)
+                notifier=lambda *a, **k: None)
 
     projects, _ = store.load(str(tmp_path))
     assert [p["full_name"] for p in projects] == ["a/x"]
@@ -77,21 +77,19 @@ def test_run_prefers_batch_translator(tmp_path):
     fetcher, enricher = _mini_fetch_enrich()
     collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-07-02",
                 fetcher=fetcher, enricher=enricher, notifier=lambda *a, **k: None,
-                translate=lambda s: "[google]" + s,
                 translate_batch=lambda texts: ["[llm]" + t for t in texts])
     projects, _ = store.load(str(tmp_path))
     assert projects[0]["description_zh"] == "[llm]A fast tool"
 
 
-def test_run_falls_back_to_per_item_when_batch_fails(tmp_path):
+def test_run_keeps_original_when_batch_fails(tmp_path):
     cfg = Config(data_dir=str(tmp_path))
     fetcher, enricher = _mini_fetch_enrich()
     collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-07-02",
                 fetcher=fetcher, enricher=enricher, notifier=lambda *a, **k: None,
-                translate=lambda s: "[google]" + s,
                 translate_batch=lambda texts: None)   # LLM 挂了
     projects, _ = store.load(str(tmp_path))
-    assert projects[0]["description_zh"] == "[google]A fast tool"
+    assert projects[0]["description_zh"] == "A fast tool"   # 保留英文原文
 
 
 def test_build_translate_batch_prefers_translate_config():
@@ -129,7 +127,6 @@ def test_run_warns_when_llm_translation_fails(tmp_path, capsys):
     fetcher, enricher = _mini_fetch_enrich()
     collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-09-01",
                 fetcher=fetcher, enricher=enricher, notifier=lambda *a, **k: None,
-                translate=lambda s: "[google]" + s,
                 translate_batch=lambda texts: None)
     out = capsys.readouterr().out
     assert "LLM 翻译失败" in out
@@ -141,7 +138,7 @@ def test_run_warns_when_descriptions_left_untranslated(tmp_path, capsys):
     fetcher, enricher = _mini_fetch_enrich()
     collect.run(cfg, "https://hook", None, _DummyEmbedder(), today="2026-09-01",
                 fetcher=fetcher, enricher=enricher, notifier=lambda *a, **k: None,
-                translate=lambda s: s)        # Google 也失败,原样返回
+                translate_batch=lambda texts: None)
     out = capsys.readouterr().out
     assert "未能翻译" in out
 

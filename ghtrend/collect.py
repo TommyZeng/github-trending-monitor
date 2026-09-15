@@ -7,12 +7,12 @@ from .embedder import Embedder, RemoteEmbedder, build_text
 from .trending_fetcher import fetch_trending
 from .github_enricher import enrich
 from .discord_notifier import send
-from .translator import translate_to_zh, llm_translate_batch
+from .translator import llm_translate_batch
 
 
 def run(config: Config, webhook_url: str, github_token, embedder, today=None,
         fetcher=fetch_trending, enricher=enrich, notifier=send,
-        translate=translate_to_zh, translate_batch=None) -> None:
+        translate_batch=None) -> None:
     today = today or datetime.now(timezone.utc).date().isoformat()
 
     raw = fetcher(since=config.trending_since, language=config.languages[0]
@@ -28,16 +28,16 @@ def run(config: Config, webhook_url: str, github_token, embedder, today=None,
         print("没有可用项目,跳过本次。")
         return
 
-    # 中文描述:优先 LLM 批量翻译(一次调用),失败回退逐条翻译
+    # 中文描述:LLM 批量翻译(内部已重试);失败则保留英文原文
     descs = [p.get("description") for p in enriched]
     zh = translate_batch(descs) if translate_batch else None
     if zh is None:
         if translate_batch:
-            print("⚠ LLM 翻译失败,回退逐条 Google 翻译(请检查 TRANSLATE_API_KEY 是否有效)")
-        zh = [translate(d) for d in descs]
+            print("⚠ LLM 翻译失败,描述将保留英文(请检查 TRANSLATE_API_KEY 是否有效)")
+        zh = [d or "" for d in descs]
     for p, z in zip(enriched, zh):
         p["description_zh"] = z
-    # 两层翻译都失败时译文=原文,推送会显示英文;必须留痕,否则降级会静默持续
+    # 译文=原文说明该条没翻成中文,推送会显示英文;必须留痕,避免降级静默持续
     untranslated = sum(1 for p in enriched
                        if p.get("description") and p["description_zh"] == p["description"])
     if untranslated:
@@ -84,7 +84,7 @@ def build_embedder(cfg: Config, api_key):
 def main() -> None:
     cfg = load_config()
     embedder = build_embedder(cfg, get_embedding_api_key())
-    # 配了公网可达的 LLM 就用它批量翻译;失败自动回退 Google 逐条翻译
+    # 配了公网可达的 LLM 就用它批量翻译;失败则描述保留英文
     key = get_translate_api_key() if cfg.translate_api_base else get_llm_api_key()
     translate_batch = build_translate_batch(cfg, key)
     if translate_batch:

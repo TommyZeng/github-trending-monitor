@@ -1,31 +1,6 @@
 from ghtrend import translator
 
 
-class _FakeTranslator:
-    def __init__(self, out): self._out = out
-    def translate(self, text): return self._out
-
-
-class _RaisingTranslator:
-    def translate(self, text): raise RuntimeError("rate limited")
-
-
-def test_empty_returns_empty():
-    assert translator.translate_to_zh("") == ""
-    assert translator.translate_to_zh(None) == ""
-
-
-def test_uses_injected_translator():
-    out = translator.translate_to_zh("A fast tool", translator=_FakeTranslator("一个快速工具"))
-    assert out == "一个快速工具"
-
-
-def test_falls_back_to_original_on_error():
-    # 翻译服务报错时不应崩溃,回退原文
-    out = translator.translate_to_zh("A fast tool", translator=_RaisingTranslator())
-    assert out == "A fast tool"
-
-
 # ---------- LLM 批量翻译 ----------
 
 class _FakeSession:
@@ -82,11 +57,12 @@ def test_llm_batch_returns_none_on_error():
     assert out is None
 
 
-def test_llm_batch_returns_none_on_length_mismatch():
+def test_llm_batch_bisects_on_length_mismatch():
+    # 整批条数不齐会触发二分拆批,拆成单条后各自对齐即成功
     sess = _FakeSession('["只有一条"]')
     out = translator.llm_translate_batch(
         ["one", "two"], api_base="b", model="m", session=sess)
-    assert out is None
+    assert out == ["只有一条", "只有一条"]
 
 
 def test_llm_batch_no_auth_header_without_key():
@@ -112,32 +88,65 @@ def test_llm_batch_strips_reasoning_think_block():
     assert out == ["轻量级工具"]
 
 
-# ---------- 翻译服务错误页面识别 ----------
+# ---------- LLM 重试(替代已失效的 Google 兜底) ----------
 
-class _ErrorPageTranslator:
-    """翻译服务故障时不抛异常,而是把错误页面文本当译文返回。"""
-    def __init__(self, page): self._page = page
-    def translate(self, text): return self._page
+class _FlakySession:
+    """前 n 次失败,之后成功。"""
+    def __init__(self, fail_times):
+        self.fail_times = fail_times
+        self.calls = 0
 
-
-_ERROR_PAGES = [
-    "Error 500 (Server Error)!!1500.That's an error.There was an error. "
-    "Please try again later.That's all we know.",
-    "Error 502 (Server Error)!!2That's an error.",
-    "<!DOCTYPE html><html><head><title>503 Service Unavailable</title></head></html>",
-]
-
-
-def test_rejects_translator_error_page_and_keeps_original():
-    for page in _ERROR_PAGES:
-        out = translator.translate_to_zh(
-            "Give your agent a computer", translator=_ErrorPageTranslator(page))
-        assert out == "Give your agent a computer", f"未识别错误页: {page[:40]}"
+    def post(self, url, json=None, headers=None, timeout=None):
+        self.calls += 1
+        failing = self.calls <= self.fail_times
+        class _Resp:
+            def raise_for_status(self):
+                if failing:
+                    raise RuntimeError("503 temporarily unavailable")
+            def json(self):
+                return {"choices": [{"message": {"content": '["工具"]'}}]}
+        return _Resp()
 
 
-def test_keeps_legitimate_translation_mentioning_error():
-    # 正常译文里出现「错误」字样不应被误杀
-    good = "一个用于处理 HTTP 500 错误的中间件"
-    out = translator.translate_to_zh(
-        "Middleware for handling HTTP 500 errors", translator=_ErrorPageTranslator(good))
-    assert out == good
+def test_llm_batch_retries_transient_failure():
+    sess = _FlakySession(fail_times=2)
+    out = translator.llm_translate_batch(["Tool"], api_base="b", model="m", session=sess)
+    assert out == ["工具"]
+    assert sess.calls == 3          # 失败 2 次后第 3 次成功
+
+
+def test_llm_batch_gives_up_after_max_attempts():
+    sess = _FlakySession(fail_times=99)
+    assert translator.llm_translate_batch(["Tool"], api_base="b", model="m", session=sess) is None
+    assert sess.calls == 3          # 最多尝试 3 次
+
+
+class _PoisonSession:
+    """含 badtext 的批次整批失败(模拟个别描述触发服务端拒绝)。"""
+    def __init__(self): self.calls = 0
+
+    def post(self, url, json=None, headers=None, timeout=None):
+        self.calls += 1
+        content_in = json["messages"][0]["content"]
+        bad = "badtext" in content_in
+        import re as _re
+        rows = _re.findall(r"^\d+\. ", content_in, flags=_re.M)
+        class _Resp:
+            def raise_for_status(self):
+                if bad:
+                    raise RuntimeError("400 rejected")
+            def json(self):
+                import json as _json
+                return {"choices": [{"message": {"content":
+                    _json.dumps([f"译{i}" for i in range(len(rows))], ensure_ascii=False)}}]}
+        return _Resp()
+
+
+def test_llm_batch_bisects_around_poison_item():
+    # 4 条里 1 条会让整批失败:其余 3 条仍应拿到译文,坏的那条保留原文
+    texts = ["t0", "t1", "badtext", "t3"]
+    out = translator.llm_translate_batch(texts, api_base="b", model="m",
+                                         session=_PoisonSession())
+    assert out is not None
+    assert out[0].startswith("译") and out[1].startswith("译") and out[3].startswith("译")
+    assert out[2] == "badtext"      # 无法翻译的保留原文
