@@ -1,7 +1,7 @@
 from datetime import timezone, datetime
 
 from . import store
-from .config import (Config, load_config, get_webhook_url, get_github_token,
+from .config import (Config, load_config, get_github_token,
                      get_llm_api_key, get_translate_api_key, get_embedding_api_key)
 from .embedder import Embedder, RemoteEmbedder, build_text
 from .trending_fetcher import fetch_trending
@@ -51,6 +51,8 @@ def run(config: Config, webhook_url: str, github_token, embedder, today=None,
     store.save(config.data_dir, projects, embeddings)
     print(f"已写入 {len(enriched)} 个项目,库总量 {len(projects)}。")
 
+    if notifier is None:        # 每日只采集;推送改由每周周报(weekly_report)负责
+        return
     # 按「今日新增 star」降序推送(无该数据的回退用总 star)
     top = sorted(enriched, key=lambda p: (p.get("stars_today") or 0, p.get("stars", 0)),
                  reverse=True)[:config.daily_top_n]
@@ -89,7 +91,7 @@ def main() -> None:
     translate_batch = build_translate_batch(cfg, key)
     if translate_batch:
         print(f"描述翻译使用 LLM: {cfg.translate_model or cfg.llm_model}")
-    run(cfg, get_webhook_url(), get_github_token(), embedder,
+    run(cfg, None, get_github_token(), embedder, notifier=None,
         translate_batch=translate_batch)
 
 

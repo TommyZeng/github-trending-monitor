@@ -1,0 +1,43 @@
+# GitHub 热门周报:汇总上周(周一~周日)上榜项目,推 Discord 并存档到 reports/
+name: weekly-report
+
+on:
+  schedule:
+    - cron: "0 1 * * 1"   # 每周一 UTC 01:00 = 北京时间 09:00
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# 与 daily.yml 共用并发组,串行执行避免 push 冲突
+concurrency:
+  group: repo-commit
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Build and send weekly report
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TRANSLATE_API_KEY: ${{ secrets.TRANSLATE_API_KEY }}   # 焦点归纳 + 周榜新项目翻译(DashScope qwen)
+        run: python -m ghtrend.weekly_report
+
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/
+          git diff --cached --quiet || git commit -m "report: weekly $(date -u +%G-W%V)"
+          git push

@@ -167,3 +167,13 @@ def test_build_embedder_requires_key_when_remote():
         assert "EMBEDDING_API_KEY" in str(e)
     else:
         raise AssertionError("应抛出 RuntimeError")
+
+
+def test_run_skips_push_when_notifier_none(tmp_path):
+    # 每日任务只采集不推送(改为每周周报)
+    cfg = Config(data_dir=str(tmp_path))
+    fetcher, enricher = _mini_fetch_enrich()
+    collect.run(cfg, None, None, _DummyEmbedder(), today="2026-10-30",
+                fetcher=fetcher, enricher=enricher, notifier=None)
+    projects, _ = store.load(str(tmp_path))
+    assert len(projects) == 1                       # 采集照常入库

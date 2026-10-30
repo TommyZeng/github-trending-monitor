@@ -1,4 +1,4 @@
-# GitHub 每日热门项目采集与 Discord 推送工作流
+# GitHub 每日热门项目采集工作流(只入库不推送;推送改由每周 weekly.yml 汇总)
 name: daily-collect
 
 on:
@@ -8,6 +8,11 @@ on:
 
 permissions:
   contents: write
+
+# 与 weekly.yml 共用一个并发组:两边都会往仓库提交,串行执行避免 push 冲突
+concurrency:
+  group: repo-commit
+  cancel-in-progress: false
 
 jobs:
   collect:
@@ -31,9 +36,8 @@ jobs:
 
       - name: Run collector
         env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TRANSLATE_API_KEY: ${{ secrets.TRANSLATE_API_KEY }}   # 描述中文翻译(DashScope qwen);未配则回退 Google 翻译
+          TRANSLATE_API_KEY: ${{ secrets.TRANSLATE_API_KEY }}   # 描述中文翻译(DashScope qwen);未配则保留英文
           EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}   # 向量编码(须与本机查询同源,未配则采集报错)
         run: python -m ghtrend.collect
 
