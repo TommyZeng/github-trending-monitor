@@ -1,8 +1,11 @@
 import os
+import re
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Body
-from fastapi.responses import HTMLResponse, JSONResponse
+import requests
+
+from fastapi import FastAPI, Body, Request
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from . import store, github_enricher, trending_fetcher
 from .config import Config
@@ -125,6 +128,68 @@ def create_app(config: Config, embedder, github_token,
             return JSONResponse(
                 {"results": [], "error": "实时语义搜索未启用(需配置 llm_api_base / reranker_api_base)"})
         return JSONResponse({"results": _summarize(realtime_fn(q))})
+
+    # ---------- 问答:转发到 Vibe-Trading API(它只监听本机,不直接对外) ----------
+    _SID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+
+    def _qa_call(method, path, **kw):
+        """调上游;未启用返回 503、上游不可用返回 502(以 JSONResponse 形式返回)。"""
+        if not config.qa_api_base:
+            return None, JSONResponse({"error": "问答功能未启用(未配置 qa_api_base)"}, status_code=503)
+        try:
+            resp = method(f"{config.qa_api_base.rstrip('/')}{path}", **kw)
+            resp.raise_for_status()
+            return resp, None
+        except Exception:
+            return None, JSONResponse({"error": "问答服务暂不可用,请确认 vibe-trading-api 服务在运行"},
+                                      status_code=502)
+
+    def _bad_sid(sid):
+        return None if _SID.fullmatch(sid) else JSONResponse({"error": "非法会话 ID"}, status_code=400)
+
+    @app.post("/api/qa/sessions")
+    def qa_create():
+        resp, err = _qa_call(requests.post, "/sessions", json={"title": "网页问答"}, timeout=30)
+        return err or JSONResponse({"session_id": resp.json()["session_id"]})
+
+    @app.post("/api/qa/sessions/{sid}/messages")
+    def qa_send(sid: str, body: dict = Body(...)):
+        if bad := _bad_sid(sid):
+            return bad
+        content = (body.get("content") or "").strip()
+        if not content:
+            return JSONResponse({"error": "问题不能为空"}, status_code=400)
+        _, err = _qa_call(requests.post, f"/sessions/{sid}/messages",
+                          json={"content": content}, timeout=30)
+        return err or JSONResponse({"ok": True})
+
+    @app.post("/api/qa/sessions/{sid}/cancel")
+    def qa_cancel(sid: str):
+        if bad := _bad_sid(sid):
+            return bad
+        _, err = _qa_call(requests.post, f"/sessions/{sid}/cancel", timeout=30)
+        return err or JSONResponse({"ok": True})
+
+    @app.get("/api/qa/sessions/{sid}/events")
+    def qa_events(sid: str, request: Request):
+        if bad := _bad_sid(sid):
+            return bad
+        # 会话级长连接:一轮回答结束后不断开,追问复用;读超时设为不限。
+        # 透传 Last-Event-ID:浏览器断线重连时上游据此续传,否则会重放整轮事件
+        last_id = request.headers.get("last-event-id")
+        upstream, err = _qa_call(requests.get, f"/sessions/{sid}/events", stream=True,
+                                 timeout=(10, None),
+                                 headers={"Last-Event-ID": last_id} if last_id else {})
+        if err:
+            return err
+
+        def relay():
+            try:
+                yield from upstream.iter_content(chunk_size=None)
+            finally:
+                upstream.close()
+        return StreamingResponse(relay(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache"})
 
     return app
 

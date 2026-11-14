@@ -268,3 +268,85 @@ def test_local_keyword_blank_query_empty(tmp_path):
     app = web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None)
     client = TestClient(app)
     assert client.get("/api/local_keyword", params={"q": "  "}).json()["results"] == []
+
+
+# ---------- 问答:转发到 Vibe-Trading API ----------
+
+class _QAResp:
+    def __init__(self, payload=None, chunks=None, status=200):
+        self._p, self._chunks, self.status_code = payload, chunks or [], status
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+    def json(self): return self._p
+    def iter_content(self, chunk_size=None): yield from self._chunks
+    def close(self): pass
+
+
+def _qa_app(tmp_path):
+    return TestClient(web.create_app(
+        Config(data_dir=str(tmp_path), qa_api_base="http://vt:8899"), _DummyEmbedder(), None))
+
+
+def test_qa_create_session_proxies(tmp_path, monkeypatch):
+    calls = {}
+    def fake_post(url, json=None, timeout=None):
+        calls["url"] = url
+        return _QAResp({"session_id": "abc123", "title": "x"})
+    monkeypatch.setattr(web.requests, "post", fake_post)
+    r = _qa_app(tmp_path).post("/api/qa/sessions")
+    assert r.json() == {"session_id": "abc123"}
+    assert calls["url"] == "http://vt:8899/sessions"
+
+
+def test_qa_send_message_forwards_content(tmp_path, monkeypatch):
+    calls = {}
+    def fake_post(url, json=None, timeout=None):
+        calls.update(url=url, json=json)
+        return _QAResp({"message_id": "m1"})
+    monkeypatch.setattr(web.requests, "post", fake_post)
+    r = _qa_app(tmp_path).post("/api/qa/sessions/abc123/messages", json={"content": " 金价多少 "})
+    assert r.json()["ok"] is True
+    assert calls["url"] == "http://vt:8899/sessions/abc123/messages"
+    assert calls["json"] == {"content": "金价多少"}
+
+
+def test_qa_send_rejects_empty(tmp_path):
+    r = _qa_app(tmp_path).post("/api/qa/sessions/abc123/messages", json={"content": "  "})
+    assert r.status_code == 400
+
+
+def test_qa_rejects_bad_session_id(tmp_path):
+    r = _qa_app(tmp_path).post("/api/qa/sessions/..%2Fetc/messages", json={"content": "x"})
+    assert r.status_code in (400, 404)
+
+
+def test_qa_events_streams_sse_through(tmp_path, monkeypatch):
+    sse = [b'event: text_delta\ndata: {"delta": "\xe9\x87\x91"}\n\n', b"event: attempt.completed\ndata: {}\n\n"]
+    monkeypatch.setattr(web.requests, "get", lambda url, stream=None, timeout=None, headers=None: _QAResp(chunks=sse))
+    r = _qa_app(tmp_path).get("/api/qa/sessions/abc123/events")
+    assert r.headers["content-type"].startswith("text/event-stream")
+    assert "text_delta" in r.text and "attempt.completed" in r.text
+
+
+def test_qa_disabled_without_config(tmp_path):
+    client = TestClient(web.create_app(Config(data_dir=str(tmp_path)), _DummyEmbedder(), None))
+    assert client.post("/api/qa/sessions").status_code == 503
+
+
+def test_qa_upstream_down_returns_502(tmp_path, monkeypatch):
+    def boom(*a, **k): raise ConnectionError("refused")
+    monkeypatch.setattr(web.requests, "post", boom)
+    r = _qa_app(tmp_path).post("/api/qa/sessions")
+    assert r.status_code == 502 and "error" in r.json()
+
+
+def test_qa_events_forwards_last_event_id(tmp_path, monkeypatch):
+    # 浏览器断线重连会带 Last-Event-ID;必须透传给上游,否则上游重放整轮事件导致文字重复
+    seen = {}
+    def fake_get(url, stream=None, timeout=None, headers=None):
+        seen["headers"] = headers
+        return _QAResp(chunks=[b": ok\n\n"])
+    monkeypatch.setattr(web.requests, "get", fake_get)
+    _qa_app(tmp_path).get("/api/qa/sessions/abc123/events", headers={"Last-Event-ID": "e42"})
+    assert seen["headers"] == {"Last-Event-ID": "e42"}

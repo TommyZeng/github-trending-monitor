@@ -26,6 +26,8 @@ class Config:
     reranker_model: str = "bge-reranker-v2-m3"
     realtime_per_keyword: int = 10
     web_port: int = 8005
+    # 网页问答转发到的 Vibe-Trading API(留空则问答功能不启用)
+    qa_api_base: str = ""
     # 监听地址:127.0.0.1=仅本机;0.0.0.0=所有接口(局域网可访问)
     web_host: str = "127.0.0.1"
     trending_since: str = "daily"

@@ -20,6 +20,8 @@ reranker_api_base: "https://llm-ood1no5eynt8jj1f.cn-beijing.maas.aliyuncs.com/co
 reranker_model: "qwen3-rerank"
 realtime_per_keyword: 10
 web_port: 8005          # 本机 web 服务端口
+# 网页「问答」标签页转发到本机 Vibe-Trading API(systemd: vibe-trading-api);留空则不启用
+qa_api_base: "http://127.0.0.1:8899"
 # 监听地址:127.0.0.1=仅本机;0.0.0.0=局域网可访问(内网用 http://10.0.0.2:8005)
 web_host: "0.0.0.0"
 trending_since: "daily"

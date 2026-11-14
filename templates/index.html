@@ -6,6 +6,8 @@
   <title>GitHub 热门项目搜索</title>
   <meta name="description" content="GitHub 热门项目语义搜索 · 本地库 / 实时全站 / 关键词 / 收藏">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f5f4f1'/%3E%3Cpath d='M16 7l2.6 5.6L24.5 13l-4.5 4 1.2 6L16 20.2 10.8 23l1.2-6-4.5-4 5.9-.4z' fill='%239a6b1f'/%3E%3C/svg%3E">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
   <style>
     :root {
       --bg: #f5f4f1;
@@ -147,6 +149,45 @@
       color: var(--text-faint); min-width: 1.6rem; text-align: right; padding-top: .15rem; }
     .card-top.ranked { align-items: baseline; }
 
+    /* 问答 */
+    .qa-thread { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.1rem; }
+    .qa-user { align-self: flex-end; max-width: 80%; white-space: pre-wrap; word-break: break-word;
+      background: var(--accent-soft); border: 1px solid var(--accent-line);
+      border-radius: var(--radius) var(--radius) 4px var(--radius); padding: .6rem .9rem; }
+    .qa-bot { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: .9rem 1.15rem; box-shadow: var(--shadow); }
+    .qa-steps { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: .78rem; color: var(--text-faint); }
+    .qa-steps:not(:empty) { margin-bottom: .5rem; }
+    .qa-steps.tail li:nth-last-child(n+5) { display: none; }   /* 进行中只显示最后 4 步 */
+    .qa-steps.folded { display: none; }                        /* 完成后整体折叠 */
+    .qa-more { display: block; font-family: var(--mono); font-size: .74rem; color: var(--text-faint);
+      background: none; border: 0; padding: 0; margin-bottom: .35rem; cursor: pointer; }
+    .qa-more:hover { color: var(--accent); }
+    .qa-more:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); border-radius: 4px; }
+    .qa-steps li.run::before { content: "⋯ "; }
+    .qa-steps li.ok::before { content: "✓ "; color: var(--accent); }
+    .qa-steps li.fail::before { content: "✗ "; color: #b4453d; }
+    .qa-answer { font-size: .95rem; line-height: 1.7; overflow-x: auto; }
+    .qa-answer p { margin: .4rem 0; }
+    .qa-answer h1, .qa-answer h2, .qa-answer h3, .qa-answer h4 { font-size: 1rem; margin: .9rem 0 .3rem; }
+    .qa-answer table { border-collapse: collapse; margin: .6rem 0; font-size: .86rem; }
+    .qa-answer th, .qa-answer td { border: 1px solid var(--border-strong); padding: .3rem .6rem; text-align: left; }
+    .qa-answer th { background: var(--bg-elev-2); }
+    .qa-answer code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev-2); padding: .05rem .3rem; border-radius: 4px; }
+    .qa-meta { font-family: var(--mono); font-size: .74rem; color: var(--text-faint); margin-top: .5rem; }
+    .qa-err { color: #b4453d; }
+    #qa-q { flex: 1; background: transparent; border: 0; outline: none; resize: none; color: var(--text);
+      font-family: var(--sans); font-size: 1rem; line-height: 1.5; padding: .8rem 0; max-height: 9rem; }
+    #qa-q::placeholder { color: var(--text-faint); }
+    .qa-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .8rem; }
+    .qa-chip { cursor: pointer; font-family: var(--sans); font-size: .82rem; color: var(--text-dim); background: var(--bg-elev);
+      border: 1px solid var(--border); border-radius: 999px; padding: .38rem .85rem; transition: color .18s, border-color .18s; }
+    .qa-chip:hover { color: var(--accent); border-color: var(--accent-line); }
+    .qa-chip:focus-visible, .qa-new:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+    .qa-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: .7rem;
+      font-size: .8rem; color: var(--text-faint); }
+    .qa-new { flex: none; cursor: pointer; background: none; border: 0; color: var(--text-dim); font-size: .8rem; text-decoration: underline; }
+
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
   </style>
 </head>
@@ -162,6 +203,7 @@
       <button class="tab" data-tab="leaderboard" role="tab">榜单</button>
       <button class="tab" data-tab="library" role="tab">项目库<span class="count" id="lib-count"></span></button>
       <button class="tab" data-tab="favorites" role="tab">收藏<span class="count" id="fav-count"></span></button>
+      <button class="tab" data-tab="qa" role="tab">问答</button>
     </nav>
 
     <!-- 搜索 -->
@@ -218,6 +260,25 @@
     <section id="tab-favorites" class="hidden">
       <p class="status" id="fav-status" aria-live="polite"></p>
       <main class="grid" id="fav-results"></main>
+    </section>
+
+    <!-- 问答(转发到本机 Vibe-Trading) -->
+    <section id="tab-qa" class="hidden">
+      <div class="qa-thread" id="qa-thread" aria-live="polite"></div>
+      <div class="field">
+        <textarea id="qa-q" rows="1" placeholder="问行情、走势或策略回测,如:GC=F 最近一个月走势如何?"></textarea>
+        <button class="go" id="qa-go">发送</button>
+      </div>
+      <div class="qa-chips">
+        <button class="qa-chip">国际金价 GC=F 最近一个月走势如何?</button>
+        <button class="qa-chip">计算 GC=F 近 3 个月的最大回撤和年化波动率</button>
+        <button class="qa-chip">回测:GC=F 跌破 60 日均线卖出、站上买入,2024 年至今的收益</button>
+        <button class="qa-chip">最近有哪些影响金价的重要新闻?</button>
+      </div>
+      <div class="qa-bar">
+        <span>国际金价用 GC=F(美元/盎司);国内用沪金 AU0 或上金所 Au99.99(元/克)</span>
+        <button class="qa-new" id="qa-new">新对话</button>
+      </div>
     </section>
   </div>
 
@@ -278,11 +339,12 @@
     /* ---- Tabs ---- */
     function switchTab(name) {
       document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
-      ['search', 'leaderboard', 'library', 'favorites'].forEach(n =>
+      ['search', 'leaderboard', 'library', 'favorites', 'qa'].forEach(n =>
         document.getElementById('tab-' + n).classList.toggle('hidden', n !== name));
       if (name === 'favorites') loadFavorites();
       if (name === 'library') loadLibrary();
       if (name === 'leaderboard') loadLeaderboard();
+      if (name === 'qa') { if (!qaThread.children.length) qaEmpty(); qaQ.focus(); }
     }
     document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
@@ -394,10 +456,157 @@
       } catch (e) { lbStatus.textContent = ''; lbBox.innerHTML = emptyBox('⚠', '加载榜单失败,请重试', true); }
     }
 
+    /* ---- 问答(经后端转发到本机 Vibe-Trading) ---- */
+    const qaThread = document.getElementById('qa-thread');
+    const qaQ = document.getElementById('qa-q');
+    const qaGo = document.getElementById('qa-go');
+    const QA_TOOLS = { get_market_data: '获取行情', technical_indicators: '计算技术指标', search_symbol: '解析代码',
+      bash: '运行计算', web_search: '联网搜索', read_url: '读取网页', backtest: '策略回测',
+      get_macro_series: '获取宏观数据', get_stock_news: '获取新闻', quantlib_call: '量化计算',
+      read_file: '读取文件', write_file: '写入文件' };
+    let qaSid = null, qaES = null, qaCur = null, qaBusy = false;
+
+    const md = text => (window.marked && window.DOMPurify)
+      ? DOMPurify.sanitize(marked.parse(text))
+      : `<p style="white-space:pre-wrap">${esc(text)}</p>`;
+    function qaEmpty() {
+      qaThread.innerHTML = emptyBox('✦', '向 Vibe-Trading 提问行情、走势或策略回测。具体问题(如「GC=F 近一个月走势」)约 10~30 秒;'
+        + '开放式问题(如「未来黄金走势」)会联网做深度研究,约 3~5 分钟。');
+    }
+    function qaSetBusy(b) { qaBusy = b; qaGo.textContent = b ? '停止' : '发送'; }
+    function qaAutosize() { qaQ.style.height = 'auto'; qaQ.style.height = qaQ.scrollHeight + 'px'; }
+
+    // 建会话并打开事件流;等事件流连通后再发问题,避免漏掉开头的事件
+    function qaOpen() {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const r = await fetch('/api/qa/sessions', { method: 'POST' });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || '创建会话失败');
+          qaSid = d.session_id;
+        } catch (e) { return reject(e); }
+        let opened = false;
+        qaES = new EventSource(`/api/qa/sessions/${qaSid}/events`);
+        qaES.onopen = () => { opened = true; resolve(); };
+        qaES.onerror = () => {      // 连通后的断线由浏览器自动重连;从未连通则报错
+          if (!opened) { qaES.close(); qaES = null; qaSid = null; reject(new Error('连接问答服务失败')); }
+        };
+        const on = (name, fn) => qaES.addEventListener(name, e => { if (qaCur) fn(qaCur, JSON.parse(e.data)); });
+        on('tool_call', (cur, d) => {
+          if (d.tool === 'load_tools') return;               // 内部加载工具,不展示
+          const a = d.arguments || {};
+          let host = '';
+          try { host = a.url ? new URL(a.url).hostname : ''; } catch (e) {}
+          const target = String(a.codes || a.symbol || a.query || host).replace(/[\[\]']/g, '');
+          const text = (QA_TOOLS[d.tool] || d.tool) + (target ? ' ' + target : '');
+          const last = cur.steps.lastElementChild;
+          if (last && last.dataset.key === text) {      // 连续相同调用合并成一行计数,避免刷屏
+            last.dataset.n = +last.dataset.n + 1;
+            last.dataset.pending = +last.dataset.pending + 1;
+            last.textContent = `${text} ×${last.dataset.n}`;
+            if (last.className !== 'fail') last.className = 'run';
+            cur.calls[d.call_id] = last;
+            return;
+          }
+          const li = document.createElement('li');
+          Object.assign(li.dataset, { key: text, n: 1, pending: 1 });
+          li.className = 'run'; li.textContent = text;
+          cur.steps.appendChild(li);
+          cur.calls[d.call_id] = li;
+          qaSteps(cur);
+        });
+        on('tool_result', (cur, d) => {   // 按 call_id 对应:并行调用时结果的返回顺序不定
+          const li = cur.calls[d.call_id];
+          if (!li) return;
+          li.dataset.pending = +li.dataset.pending - 1;
+          if (d.status !== 'ok') li.className = 'fail';
+          else if (li.className === 'run' && +li.dataset.pending <= 0) li.className = 'ok';
+          if (li.dataset.n === '1' && d.elapsed_ms != null) li.textContent += ` (${d.elapsed_ms}ms)`;
+        });
+        on('text_delta', (cur, d) => { cur.text += d.delta || ''; qaRender(cur); });
+        on('attempt.completed', (cur, d) => qaFinish(cur, d.summary, d.error));
+        on('attempt.failed', (cur, d) => qaFinish(cur, null, d.error || '回答失败'));
+        on('attempt.cancelled', cur => qaFinish(cur, null, '已停止'));
+        on('attempt.interrupted', cur => qaFinish(cur, null, '回答被中断'));
+      });
+    }
+    const QA_TAIL = 4;              // 进行中露出的步数
+    function qaSteps(cur) {
+      const n = cur.steps.children.length, more = cur.more;
+      if (cur.done) {
+        cur.steps.className = 'qa-steps' + (cur.open ? '' : ' folded');
+        more.hidden = !n;
+        more.textContent = `${cur.open ? '▾ 收起' : '▸ 查看'}过程(${n} 步)`;
+      } else {
+        cur.steps.className = 'qa-steps' + (cur.open ? '' : ' tail');
+        more.hidden = cur.open || n <= QA_TAIL;
+        more.textContent = `… 前面还有 ${n - QA_TAIL} 步,点击展开`;
+      }
+    }
+    function qaRender(cur) {          // 流式片段合并到下一帧再渲染,避免逐字重排
+      if (cur.raf) return;
+      cur.raf = requestAnimationFrame(() => { cur.raf = 0; cur.answer.innerHTML = md(cur.text); });
+    }
+    function qaFinish(cur, summary, error) {
+      if (qaCur !== cur) return;
+      qaCur = null;
+      clearInterval(cur.timer); cancelAnimationFrame(cur.raf);
+      cur.done = true; cur.open = false; qaSteps(cur);
+      if (!cur.text && summary) cur.text = summary;      // 没收到流式片段时用最终结果兜底
+      cur.answer.innerHTML = cur.text ? md(cur.text) : '';
+      const secs = Math.round((Date.now() - cur.t0) / 1000);
+      cur.meta.innerHTML = cur.text ? `用时 ${secs} 秒` : '';
+      if (error) cur.meta.innerHTML += (cur.text ? ' · ' : '') + `<span class="qa-err">${esc(error)}</span>`;
+      qaSetBusy(false);
+    }
+    async function qaSend(text) {
+      const q = (text ?? qaQ.value).trim();
+      if (!q || qaBusy) return;
+      qaQ.value = ''; qaAutosize();
+      if (qaThread.querySelector('.empty')) qaThread.innerHTML = '';
+      qaThread.insertAdjacentHTML('beforeend', `<div class="qa-user">${esc(q)}</div>`);
+      const bot = document.createElement('div');
+      bot.className = 'qa-bot';
+      bot.innerHTML = '<button class="qa-more" hidden></button><ul class="qa-steps tail"></ul>'
+        + '<div class="qa-answer"></div><div class="qa-meta">思考中…</div>';
+      qaThread.appendChild(bot);
+      const cur = { text: '', raf: 0, t0: Date.now(), done: false, open: false, calls: {},
+                    more: bot.querySelector('.qa-more'), steps: bot.querySelector('.qa-steps'),
+                    answer: bot.querySelector('.qa-answer'), meta: bot.querySelector('.qa-meta') };
+      cur.more.addEventListener('click', () => { cur.open = !cur.open; qaSteps(cur); });
+      cur.timer = setInterval(() => {
+        const sec = Math.round((Date.now() - cur.t0) / 1000);
+        cur.meta.textContent = `思考中… ${sec} 秒` + (sec >= 30 ? ' · 正在联网深度研究,开放式问题通常需要 3~5 分钟' : '');
+      }, 1000);
+      qaSetBusy(true);
+      bot.scrollIntoView({ block: 'end', behavior: 'smooth' });
+      try {
+        if (!qaSid) await qaOpen();
+        qaCur = cur;
+        const r = await fetch(`/api/qa/sessions/${qaSid}/messages`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: q }) });
+        if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || '发送失败'); }
+      } catch (e) { qaCur = cur; qaFinish(cur, null, e.message); }
+    }
+    qaGo.addEventListener('click', () => {
+      if (qaBusy) { if (qaSid) fetch(`/api/qa/sessions/${qaSid}/cancel`, { method: 'POST' }).catch(() => {}); }
+      else qaSend();
+    });
+    qaQ.addEventListener('keydown', e => {      // Enter 发送、Shift+Enter 换行;输入法组字中不发送
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); qaSend(); }
+    });
+    qaQ.addEventListener('input', qaAutosize);
+    document.querySelectorAll('.qa-chip').forEach(b => b.addEventListener('click', () => qaSend(b.textContent)));
+    document.getElementById('qa-new').addEventListener('click', () => {
+      if (qaES) qaES.close();
+      if (qaCur) { clearInterval(qaCur.timer); qaCur = null; }
+      qaES = null; qaSid = null; qaSetBusy(false); qaEmpty(); qaQ.focus();
+    });
+
     // 分享链接:/?q=...&mode=... 预填并自动搜索;?tab=favorites/library/leaderboard 直接打开对应页
     const params = new URLSearchParams(location.search);
     const ptab = params.get('tab');
-    if (['favorites', 'library', 'leaderboard'].includes(ptab)) switchTab(ptab);
+    if (['favorites', 'library', 'leaderboard', 'qa'].includes(ptab)) switchTab(ptab);
     const pm = params.get('mode'); if (pm && modeLabel[pm]) setMode(pm);
     const pq = params.get('q'); if (pq) { qEl.value = pq; run(); } else { qEl.focus(); }
   </script>
