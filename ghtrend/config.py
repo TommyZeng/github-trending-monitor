@@ -28,6 +28,8 @@ class Config:
     web_port: int = 8005
     # 网页问答转发到的 Vibe-Trading API(留空则问答功能不启用)
     qa_api_base: str = ""
+    # Vibe-Trading 生成的图表所在目录;问答页只允许读取这里面的图片
+    qa_runs_dir: str = "~/.vibe-trading/runs"
     # 监听地址:127.0.0.1=仅本机;0.0.0.0=所有接口(局域网可访问)
     web_host: str = "127.0.0.1"
     trending_since: str = "daily"

@@ -350,3 +350,73 @@ def test_qa_events_forwards_last_event_id(tmp_path, monkeypatch):
     monkeypatch.setattr(web.requests, "get", fake_get)
     _qa_app(tmp_path).get("/api/qa/sessions/abc123/events", headers={"Last-Event-ID": "e42"})
     assert seen["headers"] == {"Last-Event-ID": "e42"}
+
+
+# ---------- 问答:展示 Vibe-Trading 生成的图片 ----------
+
+def _files_app(tmp_path):
+    runs = tmp_path / "runs"
+    (runs / "r1").mkdir(parents=True)
+    (runs / "r1" / "chart.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
+    (runs / "r1" / "data.json").write_text("{}")
+    (tmp_path / "secret.svg").write_text("<svg/>")
+    client = TestClient(web.create_app(
+        Config(data_dir=str(tmp_path), qa_api_base="http://vt:8899", qa_runs_dir=str(runs)),
+        _DummyEmbedder(), None))
+    return client, runs
+
+
+def test_qa_file_serves_image_with_sandbox_csp(tmp_path):
+    client, runs = _files_app(tmp_path)
+    r = client.get("/api/qa/files", params={"path": str(runs / "r1" / "chart.svg")})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/svg+xml")
+    # 直接在新标签页打开 SVG 时也不能执行其中的脚本
+    assert "sandbox" in r.headers["content-security-policy"]
+    assert r.headers["x-content-type-options"] == "nosniff"
+
+
+def test_qa_file_rejects_path_traversal(tmp_path):
+    client, runs = _files_app(tmp_path)
+    r = client.get("/api/qa/files", params={"path": str(runs / ".." / "secret.svg")})
+    assert r.status_code == 403
+
+
+def test_qa_file_rejects_symlink_escape(tmp_path):
+    client, runs = _files_app(tmp_path)
+    (runs / "r1" / "link.svg").symlink_to(tmp_path / "secret.svg")
+    r = client.get("/api/qa/files", params={"path": str(runs / "r1" / "link.svg")})
+    assert r.status_code == 403
+
+
+def test_qa_file_rejects_non_image(tmp_path):
+    client, runs = _files_app(tmp_path)
+    r = client.get("/api/qa/files", params={"path": str(runs / "r1" / "data.json")})
+    assert r.status_code == 403
+
+
+def test_qa_file_missing_returns_404(tmp_path):
+    client, runs = _files_app(tmp_path)
+    r = client.get("/api/qa/files", params={"path": str(runs / "r1" / "nope.png")})
+    assert r.status_code == 404
+
+
+def test_qa_file_html_chart_scripts_isolated(tmp_path):
+    # 模型生成的 HTML 图表常用脚本绘图:允许内联脚本,但隔离在无主来源里且禁止任何网络请求
+    client, runs = _files_app(tmp_path)
+    (runs / "r1" / "chart.html").write_text("<html><body><script>1</script></body></html>")
+    r = client.get("/api/qa/files", params={"path": str(runs / "r1" / "chart.html")})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    csp = r.headers["content-security-policy"]
+    assert "default-src 'none'" in csp                    # 连带禁掉 fetch/XHR/外部资源
+    assert "script-src 'unsafe-inline'" in csp            # 只许内联脚本,不许外链
+    assert "sandbox allow-scripts" in csp
+    assert "allow-same-origin" not in csp                 # 脚本碰不到问答页的 DOM/cookie
+
+
+def test_qa_file_svg_never_runs_scripts(tmp_path):
+    client, runs = _files_app(tmp_path)
+    r = client.get("/api/qa/files", params={"path": str(runs / "r1" / "chart.svg")})
+    csp = r.headers["content-security-policy"]
+    assert "allow-scripts" not in csp and "script-src" not in csp

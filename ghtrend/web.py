@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import requests
 
 from fastapi import FastAPI, Body, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
 from . import store, github_enricher, trending_fetcher
 from .config import Config
@@ -191,6 +191,29 @@ def create_app(config: Config, embedder, github_token,
         return StreamingResponse(relay(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache"})
 
+    # 模型画图有时输出图片,有时输出内嵌 SVG 的 HTML,两种都放行
+    _FIG_TYPES = {".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
+                  ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif",
+                  ".html": "text/html", ".htm": "text/html"}
+
+    @app.get("/api/qa/files")
+    def qa_file(path: str):
+        # 只放行 runs 目录内的图表文件;按真实路径校验,挡住 ../ 和软链接越界
+        root = os.path.realpath(os.path.expanduser(config.qa_runs_dir))
+        real = os.path.realpath(os.path.expanduser(path))
+        ext = os.path.splitext(real)[1].lower()
+        if not real.startswith(root + os.sep) or ext not in _FIG_TYPES:
+            return JSONResponse({"error": "不允许访问该文件"}, status_code=403)
+        if not os.path.isfile(real):
+            return JSONResponse({"error": "文件不存在"}, status_code=404)
+        # 内容由模型生成,CSP 兜底(直接在新标签页打开时同样生效):default-src 'none' 禁止一切
+        # 网络请求与外部资源。HTML 图表常用脚本绘图,允许内联脚本,但 sandbox 不给 allow-same-origin,
+        # 脚本处于无主来源,碰不到本站 DOM/cookie;图片类一律不许脚本
+        csp = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; "
+        csp += ("script-src 'unsafe-inline'; sandbox allow-scripts" if ext in (".html", ".htm") else "sandbox")
+        return FileResponse(real, media_type=_FIG_TYPES[ext], headers={
+            "Content-Security-Policy": csp, "X-Content-Type-Options": "nosniff"})
+
     return app
 
 
@@ -233,7 +256,8 @@ def main() -> None:
     app = create_app(cfg, embedder, github_token,
                      realtime_fn=realtime_fn, summarize_fn=summarize_fn)
     print(f"启动 web 服务: http://{cfg.web_host}:{cfg.web_port}")
-    uvicorn.run(app, host=cfg.web_host, port=cfg.web_port)
+    # 问答页的事件流是长连接,默认会一直等它关闭才退出(systemd 重启要卡 90 秒超时);最多等 3 秒
+    uvicorn.run(app, host=cfg.web_host, port=cfg.web_port, timeout_graceful_shutdown=3)
 
 
 if __name__ == "__main__":

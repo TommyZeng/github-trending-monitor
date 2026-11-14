@@ -174,6 +174,12 @@
     .qa-answer th, .qa-answer td { border: 1px solid var(--border-strong); padding: .3rem .6rem; text-align: left; }
     .qa-answer th { background: var(--bg-elev-2); }
     .qa-answer code { font-family: var(--mono); font-size: .85em; background: var(--bg-elev-2); padding: .05rem .3rem; border-radius: 4px; }
+    .qa-figs { display: grid; gap: .6rem; margin-top: .6rem; }
+    .qa-figs img, .qa-figs iframe { display: block; max-width: 100%; background: #fff;
+      border: 1px solid var(--border); border-radius: 10px; }
+    .qa-figs img { height: auto; }
+    .qa-figs iframe { width: 100%; height: 560px; }
+    .qa-figs .open { font-size: .78rem; color: var(--text-dim); margin-top: .25rem; display: inline-block; }
     .qa-meta { font-family: var(--mono); font-size: .74rem; color: var(--text-faint); margin-top: .5rem; }
     .qa-err { color: #b4453d; }
     #qa-q { flex: 1; background: transparent; border: 0; outline: none; resize: none; color: var(--text);
@@ -463,7 +469,7 @@
     const QA_TOOLS = { get_market_data: '获取行情', technical_indicators: '计算技术指标', search_symbol: '解析代码',
       bash: '运行计算', web_search: '联网搜索', read_url: '读取网页', backtest: '策略回测',
       get_macro_series: '获取宏观数据', get_stock_news: '获取新闻', quantlib_call: '量化计算',
-      read_file: '读取文件', write_file: '写入文件' };
+      read_file: '读取文件', write_file: '写入文件', edit_file: '编辑文件' };
     let qaSid = null, qaES = null, qaCur = null, qaBusy = false;
 
     const md = text => (window.marked && window.DOMPurify)
@@ -524,7 +530,7 @@
           if (li.dataset.n === '1' && d.elapsed_ms != null) li.textContent += ` (${d.elapsed_ms}ms)`;
         });
         on('text_delta', (cur, d) => { cur.text += d.delta || ''; qaRender(cur); });
-        on('attempt.completed', (cur, d) => qaFinish(cur, d.summary, d.error));
+        on('attempt.completed', (cur, d) => qaFinish(cur, d.summary, d.error, d.run_dir));
         on('attempt.failed', (cur, d) => qaFinish(cur, null, d.error || '回答失败'));
         on('attempt.cancelled', cur => qaFinish(cur, null, '已停止'));
         on('attempt.interrupted', cur => qaFinish(cur, null, '回答被中断'));
@@ -547,13 +553,40 @@
       if (cur.raf) return;
       cur.raf = requestAnimationFrame(() => { cur.raf = 0; cur.answer.innerHTML = md(cur.text); });
     }
-    function qaFinish(cur, summary, error) {
+    // 回答里提到的图表(图片或内嵌 SVG 的 HTML):绝对路径直接用,相对路径拼上本次运行目录;能否读取由后端校验
+    // 允许子目录与 = + @ 等(如 charts/GC=F_close.svg);\w 不含中文,不会吞掉前面的中文标点
+    const QA_IMG = /[\w.\/=+@%~\-]+\.(?:svg|png|jpe?g|webp|gif|html?)\b/gi;
+    function qaFigures(cur, runDir) {
+      const paths = [...new Set((cur.text.match(QA_IMG) || [])
+        .map(p => p.startsWith('/') ? p : (runDir ? `${runDir}/${p.replace(/^\.\//, '')}` : null)).filter(Boolean))];
+      if (!paths.length) return;
+      const box = document.createElement('div');
+      box.className = 'qa-figs';
+      cur.answer.after(box);
+      for (const p of paths) {
+        const url = '/api/qa/files?path=' + encodeURIComponent(p);
+        const fig = box.appendChild(document.createElement('div'));   // 先按回答中的顺序占位
+        // 先确认可读再填充:iframe 加载失败不会触发 onerror;不存在或不允许读取的路径移除占位
+        fetch(url).then(r => {
+          if (!r.ok) return fig.remove();
+          if (/\.html?$/i.test(p)) {          // HTML 图表常靠脚本绘图:只给 allow-scripts,无主来源、不能联网
+            fig.innerHTML = `<iframe sandbox="allow-scripts" src="${url}" title="${esc(p.split('/').pop())}" loading="lazy"></iframe>`
+              + `<a class="open" href="${url}" target="_blank" rel="noopener">在新标签页打开 ↗</a>`;
+          } else {
+            fig.innerHTML = `<a href="${url}" target="_blank" rel="noopener" title="在新标签页查看大图">`
+              + `<img src="${url}" alt="${esc(p.split('/').pop())}" loading="lazy"></a>`;
+          }
+        }).catch(() => fig.remove());
+      }
+    }
+    function qaFinish(cur, summary, error, runDir) {
       if (qaCur !== cur) return;
       qaCur = null;
       clearInterval(cur.timer); cancelAnimationFrame(cur.raf);
       cur.done = true; cur.open = false; qaSteps(cur);
       if (!cur.text && summary) cur.text = summary;      // 没收到流式片段时用最终结果兜底
       cur.answer.innerHTML = cur.text ? md(cur.text) : '';
+      if (cur.text) qaFigures(cur, runDir);
       const secs = Math.round((Date.now() - cur.t0) / 1000);
       cur.meta.innerHTML = cur.text ? `用时 ${secs} 秒` : '';
       if (error) cur.meta.innerHTML += (cur.text ? ' · ' : '') + `<span class="qa-err">${esc(error)}</span>`;
